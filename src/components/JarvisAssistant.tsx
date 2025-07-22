@@ -5,6 +5,10 @@ import { ControlPanel } from './ControlPanel';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import { useToast } from '@/hooks/use-toast';
+import { MemoryService } from '@/services/MemoryService';
+import { SearchService } from '@/services/SearchService';
+import { SystemService } from '@/services/SystemService';
+import { ReminderService } from '@/services/ReminderService';
 
 interface ChatMessage {
   id: string;
@@ -25,6 +29,11 @@ export const JarvisAssistant = () => {
 
   const { speak, isSpeaking, stop: stopSpeaking } = useTextToSpeech();
 
+  // Request notification permission on mount
+  useEffect(() => {
+    ReminderService.requestNotificationPermission();
+  }, []);
+
   const handleSpeechResult = useCallback((result: any) => {
     if (result.isFinal) {
       const transcript = result.transcript.toLowerCase().trim();
@@ -32,11 +41,14 @@ export const JarvisAssistant = () => {
       // Check for wake phrase
       if (!isActive && WAKE_PHRASES.some(phrase => transcript.includes(phrase))) {
         setIsActive(true);
-        speak('Hello! JARVIS is now active. How can I help you?');
+        const hinglishGreeting = Math.random() > 0.5 
+          ? 'Hello bro! JARVIS active ho gaya hai. Kya kaam hai?'
+          : 'Hey! JARVIS is now active. How can I help you?';
+        speak(hinglishGreeting);
         
         const newMessage: ChatMessage = {
           id: Date.now().toString(),
-          text: 'JARVIS is now active. How can I help you?',
+          text: hinglishGreeting,
           isUser: false,
           timestamp: new Date()
         };
@@ -65,58 +77,149 @@ export const JarvisAssistant = () => {
     'en-US'
   );
 
-  const processCommand = (command: string) => {
+  const processCommand = async (command: string) => {
     let response = '';
+    const lowerCommand = command.toLowerCase();
 
-    // Command processing logic
-    if (command.includes('time')) {
+    // Enhanced command processing with Hinglish support
+    if (lowerCommand.includes('time') || lowerCommand.includes('samay')) {
       const now = new Date();
-      response = `The current time is ${now.toLocaleTimeString()}`;
-    } else if (command.includes('date')) {
+      const hinglishTime = Math.random() > 0.5 
+        ? `Abhi time hai ${now.toLocaleTimeString()}`
+        : `The current time is ${now.toLocaleTimeString()}`;
+      response = hinglishTime;
+    } 
+    else if (lowerCommand.includes('date') || lowerCommand.includes('tarikh') || lowerCommand.includes('din')) {
       const today = new Date();
-      response = `Today is ${today.toLocaleDateString()}`;
-    } else if (command.includes('email')) {
-      response = 'Email feature activated. I can help you read and compose emails.';
+      const hinglishDate = Math.random() > 0.5 
+        ? `Aaj ka date hai ${today.toLocaleDateString()}`
+        : `Today is ${today.toLocaleDateString()}`;
+      response = hinglishDate;
+    }
+    // Memory commands
+    else if (lowerCommand.includes('naam yaad rakho') || lowerCommand.includes('remember my name')) {
+      const nameMatch = command.match(/naam\s+(.+?)\s+yaad\s+rakho|my\s+name\s+is\s+(.+)/i);
+      if (nameMatch) {
+        const name = nameMatch[1] || nameMatch[2];
+        MemoryService.saveMemory('user_name', name);
+        response = `Theek hai bro, main yaad rakh lunga ki aapka naam ${name} hai.`;
+      } else {
+        response = 'Bataiye aapka naam kya hai? Boliye "mera naam [your name] yaad rakho"';
+      }
+    }
+    else if (lowerCommand.includes('mera naam kya hai') || lowerCommand.includes('what is my name')) {
+      const name = MemoryService.getMemory('user_name');
+      response = name 
+        ? `Aapka naam ${name} hai, yaad hai mujhe!`
+        : 'Sorry bro, mujhe aapka naam yaad nahi hai. Pehle bataiye "mera naam [your name] yaad rakho"';
+    }
+    // Web search
+    else if (lowerCommand.includes('search') || lowerCommand.includes('google') || lowerCommand.includes('khojo')) {
+      const searchMatch = command.match(/search\s+(.+)|google\s+(.+)|khojo\s+(.+)/i);
+      if (searchMatch) {
+        const query = searchMatch[1] || searchMatch[2] || searchMatch[3];
+        response = 'Searching kar raha hun... wait karo';
+        
+        // Add immediate response
+        const searchingMessage: ChatMessage = {
+          id: Date.now().toString(),
+          text: response,
+          isUser: false,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, searchingMessage]);
+        
+        if (!isMuted) speak(response);
+        
+        // Perform search
+        const searchResult = await SearchService.searchWeb(query);
+        response = `Search result: ${searchResult}`;
+      } else {
+        response = 'Kya search karna hai? Boliye "search [your query]"';
+      }
+    }
+    // System commands
+    else if (lowerCommand.includes('open') || lowerCommand.includes('kholo')) {
+      response = SystemService.executeCommand(command);
+    }
+    // Reminders
+    else if (lowerCommand.includes('remind me') || lowerCommand.includes('yaad dilana')) {
+      const reminderMatch = command.match(/remind\s+me\s+(.+?)\s+in\s+(\d+)\s+minute|yaad\s+dilana\s+(.+?)\s+(\d+)\s+minute/i);
+      if (reminderMatch) {
+        const text = reminderMatch[1] || reminderMatch[3];
+        const minutes = parseInt(reminderMatch[2] || reminderMatch[4]);
+        response = ReminderService.setReminder(text, minutes);
+      } else {
+        response = 'Reminder kaise set karu? Boliye "remind me [task] in [number] minutes"';
+      }
+    }
+    // Feature activation with Hinglish
+    else if (lowerCommand.includes('email')) {
+      response = Math.random() > 0.5 
+        ? 'Email feature activate ho gaya hai. Main aapke emails read aur compose kar sakta hun.'
+        : 'Email feature activated. I can help you read and compose emails.';
       if (!activeFeatures.includes('email')) {
         setActiveFeatures(prev => [...prev, 'email']);
       }
-    } else if (command.includes('youtube') || command.includes('music')) {
-      response = 'YouTube and music control is now active. You can ask me to play songs or control playback.';
+    }
+    else if (lowerCommand.includes('youtube') || lowerCommand.includes('music') || lowerCommand.includes('gaana')) {
+      response = Math.random() > 0.5 
+        ? 'YouTube aur music control active hai. Gaane play kar sakta hun.'
+        : 'YouTube and music control is now active. You can ask me to play songs.';
       if (!activeFeatures.includes('youtube')) {
         setActiveFeatures(prev => [...prev, 'youtube']);
       }
-    } else if (command.includes('screen') || command.includes('automation')) {
-      response = 'Screen automation feature is ready. I can help you automate screen tasks.';
+    }
+    else if (lowerCommand.includes('screen') || lowerCommand.includes('automation')) {
+      response = 'Screen automation feature ready hai. Screen tasks automate kar sakta hun.';
       if (!activeFeatures.includes('screen')) {
         setActiveFeatures(prev => [...prev, 'screen']);
       }
-    } else if (command.includes('study') || command.includes('learn')) {
-      response = 'Study helper mode is activated. I can assist you with learning and research.';
+    }
+    else if (lowerCommand.includes('study') || lowerCommand.includes('padhai')) {
+      response = Math.random() > 0.5 
+        ? 'Study helper mode activate! Padhai mein help kar sakta hun.'
+        : 'Study helper mode activated. I can assist with learning and research.';
       if (!activeFeatures.includes('study')) {
         setActiveFeatures(prev => [...prev, 'study']);
       }
-    } else if (command.includes('face') || command.includes('recognition')) {
-      response = 'Face recognition system is ready. Note: Camera access may be required.';
+    }
+    else if (lowerCommand.includes('face') || lowerCommand.includes('recognition')) {
+      response = 'Face recognition system ready hai. Camera access chahiye hoga.';
       if (!activeFeatures.includes('face')) {
         setActiveFeatures(prev => [...prev, 'face']);
       }
-    } else if (command.includes('app') || command.includes('application')) {
-      response = 'App control is now active. I can help you manage and control applications.';
+    }
+    else if (lowerCommand.includes('app') || lowerCommand.includes('application')) {
+      response = Math.random() > 0.5 
+        ? 'App control activate ho gaya. Applications manage kar sakta hun.'
+        : 'App control is now active. I can help manage applications.';
       if (!activeFeatures.includes('apps')) {
         setActiveFeatures(prev => [...prev, 'apps']);
       }
-    } else if (command.includes('goodbye') || command.includes('bye') || command.includes('sleep')) {
-      response = 'JARVIS going to sleep mode. Say "Hey Bro" to wake me up again.';
+    }
+    else if (lowerCommand.includes('goodbye') || lowerCommand.includes('bye') || lowerCommand.includes('sleep') || lowerCommand.includes('alvida')) {
+      response = Math.random() > 0.5 
+        ? 'Theek hai bro, main sleep mode mein ja raha hun. "Hey Bro" bolke wapas jagana.'
+        : 'JARVIS going to sleep mode. Say "Hey Bro" to wake me up again.';
       setIsActive(false);
-    } else if (command.includes('mute') || command.includes('quiet')) {
+    }
+    else if (lowerCommand.includes('mute') || lowerCommand.includes('chup')) {
       setIsMuted(true);
-      response = 'Audio output muted.';
-    } else if (command.includes('unmute') || command.includes('speak')) {
+      response = 'Audio mute kar diya hai.';
+    }
+    else if (lowerCommand.includes('unmute') || lowerCommand.includes('bol')) {
       setIsMuted(false);
-      response = 'Audio output restored.';
-    } else {
-      // Default AI response
-      response = `I heard you say "${command}". I'm a prototype AI assistant. I can help with email, YouTube control, screen automation, study assistance, face recognition, and app control. What would you like me to do?`;
+      response = 'Audio restore ho gaya hai.';
+    }
+    else {
+      // Enhanced default response with Hinglish
+      const hinglishResponses = [
+        `Samjha nahi bro. Main ye kar sakta hun: email, YouTube, face recognition, screen automation, study help, reminders, web search, system commands. Kya chahiye?`,
+        `I heard "${command}". Main ek AI assistant hun jo email, music, apps control kar sakta hun. Aur kya help chahiye?`,
+        `Confuse ho gaya. Try karo: "search something", "open notepad", "remind me task in 5 minutes", ya "mera naam yaad rakho"`
+      ];
+      response = hinglishResponses[Math.floor(Math.random() * hinglishResponses.length)];
     }
 
     // Add AI response to chat
@@ -187,7 +290,10 @@ export const JarvisAssistant = () => {
             JARVIS
           </h1>
           <p className="text-muted-foreground text-lg">
-            AI Voice Assistant - {isActive ? 'Active' : 'Standby Mode'}
+            Enhanced AI Voice Assistant - {isActive ? 'Active' : 'Standby Mode'}
+          </p>
+          <p className="text-xs text-jarvis-blue-light mt-2">
+            Features: Voice I/O • System Commands • Web Search • Memory • Reminders • Hinglish Support
           </p>
         </div>
 
@@ -205,12 +311,17 @@ export const JarvisAssistant = () => {
           {/* Status Message */}
           <div className="text-center jarvis-fade-in">
             {!isActive ? (
-              <p className="text-jarvis-blue text-xl">
-                Say "Hey Bro" to activate JARVIS
-              </p>
+              <div>
+                <p className="text-jarvis-blue text-xl mb-2">
+                  Say "Hey Bro" to activate JARVIS
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Try: "search something" • "open notepad" • "remind me in 5 minutes" • "mera naam yaad rakho"
+                </p>
+              </div>
             ) : (
               <p className="text-jarvis-blue-light text-lg">
-                {isListening ? 'Listening...' : 'Click the mic to speak'}
+                {isListening ? 'Listening... (Hinglish supported)' : 'Click the mic to speak'}
               </p>
             )}
           </div>
