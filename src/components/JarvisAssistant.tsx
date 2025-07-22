@@ -58,14 +58,14 @@ export const JarvisAssistant = () => {
         processCommand(transcript);
       }
     }
-  }, [isActive, speak]);
+  }, [isActive]); // Removed speak and processCommand from dependencies to prevent re-renders
 
   const { isListening, startListening, stopListening } = useSpeechRecognition(
     handleSpeechResult,
     'en-US'
   );
 
-  const processCommand = useCallback(async (command: string) => {
+  const processCommand = (command: string) => {
     let response = '';
 
     // Command processing logic
@@ -132,7 +132,7 @@ export const JarvisAssistant = () => {
     if (!isMuted && response) {
       speak(response);
     }
-  }, [speak, isMuted, activeFeatures]);
+  };
 
   const handleToggleListening = () => {
     if (isListening) {
@@ -172,13 +172,11 @@ export const JarvisAssistant = () => {
   // Auto-start listening when component mounts
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (!isListening) {
-        startListening();
-      }
+      startListening();
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [startListening, isListening]);
+  }, []); // Empty dependency array to run only once on mount
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-jarvis-dark via-jarvis-dark-light to-jarvis-dark p-4">

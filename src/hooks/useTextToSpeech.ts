@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 interface UseTextToSpeechReturn {
   speak: (text: string, options?: SpeechSynthesisUtterance) => void;
@@ -23,11 +23,18 @@ export const useTextToSpeech = (): UseTextToSpeechReturn => {
     }
   }, [isSupported]);
 
-  // Load voices when they become available
-  if (isSupported) {
-    speechSynthesis.onvoiceschanged = updateVoices;
-    updateVoices();
-  }
+  // Load voices when they become available - moved to useEffect
+  useEffect(() => {
+    if (isSupported) {
+      speechSynthesis.onvoiceschanged = updateVoices;
+      updateVoices();
+      
+      // Cleanup function
+      return () => {
+        speechSynthesis.onvoiceschanged = null;
+      };
+    }
+  }, [isSupported, updateVoices]);
 
   const speak = useCallback((text: string, options?: Partial<SpeechSynthesisUtterance>) => {
     if (!isSupported) {
