@@ -26,16 +26,34 @@ export class SystemService {
 
   private static openNotepad(): void {
     const notepadWindow = window.open('', '_blank', 'width=600,height=400');
-    if (notepadWindow) {
-      notepadWindow.document.write(`
-        <html>
-          <head><title>JARVIS Notepad</title></head>
-          <body style="margin:0;padding:20px;font-family:monospace;">
-            <h3>JARVIS Notepad</h3>
-            <textarea style="width:100%;height:300px;font-size:14px;padding:10px;border:1px solid #ccc;" placeholder="Start typing..."></textarea>
-          </body>
-        </html>
-      `);
+    if (notepadWindow && notepadWindow.document) {
+      // Secure DOM manipulation instead of document.write
+      const doc = notepadWindow.document;
+      
+      // Create elements securely
+      const html = doc.createElement('html');
+      const head = doc.createElement('head');
+      const title = doc.createElement('title');
+      title.textContent = 'JARVIS Notepad';
+      
+      const body = doc.createElement('body');
+      body.style.cssText = 'margin:0;padding:20px;font-family:monospace;';
+      
+      const heading = doc.createElement('h3');
+      heading.textContent = 'JARVIS Notepad';
+      
+      const textarea = doc.createElement('textarea');
+      textarea.style.cssText = 'width:100%;height:300px;font-size:14px;padding:10px;border:1px solid #ccc;';
+      textarea.placeholder = 'Start typing...';
+      
+      // Assemble document
+      head.appendChild(title);
+      body.appendChild(heading);
+      body.appendChild(textarea);
+      html.appendChild(head);
+      html.appendChild(body);
+      
+      doc.appendChild(html);
     }
   }
 
@@ -45,23 +63,59 @@ export class SystemService {
 
   private static openCalculator(): void {
     const calcWindow = window.open('', '_blank', 'width=300,height=400');
-    if (calcWindow) {
-      calcWindow.document.write(`
-        <html>
-          <head><title>JARVIS Calculator</title></head>
-          <body style="margin:0;padding:20px;font-family:Arial;">
-            <h3>JARVIS Calculator</h3>
-            <input type="text" id="calc" style="width:100%;height:50px;font-size:20px;text-align:right;padding:10px;" readonly>
-            <div style="margin-top:10px;">
-              <button onclick="calc.value+='7'" style="width:23%;height:50px;font-size:18px;margin:1%;">7</button>
-              <button onclick="calc.value+='8'" style="width:23%;height:50px;font-size:18px;margin:1%;">8</button>
-              <button onclick="calc.value+='9'" style="width:23%;height:50px;font-size:18px;margin:1%;">9</button>
-              <button onclick="calc.value+='/'" style="width:23%;height:50px;font-size:18px;margin:1%;">÷</button>
-            </div>
-            <script>const calc = document.getElementById('calc');</script>
-          </body>
-        </html>
-      `);
+    if (calcWindow && calcWindow.document) {
+      // Secure DOM manipulation instead of document.write
+      const doc = calcWindow.document;
+      
+      const html = doc.createElement('html');
+      const head = doc.createElement('head');
+      const title = doc.createElement('title');
+      title.textContent = 'JARVIS Calculator';
+      
+      const body = doc.createElement('body');
+      body.style.cssText = 'margin:0;padding:20px;font-family:Arial;';
+      
+      const heading = doc.createElement('h3');
+      heading.textContent = 'JARVIS Calculator';
+      
+      const input = doc.createElement('input');
+      input.type = 'text';
+      input.id = 'calc';
+      input.style.cssText = 'width:100%;height:50px;font-size:20px;text-align:right;padding:10px;';
+      input.readOnly = true;
+      
+      const buttonContainer = doc.createElement('div');
+      buttonContainer.style.cssText = 'margin-top:10px;';
+      
+      // Create calculator buttons securely
+      const numbers = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '-', '0', '.', '=', '+'];
+      numbers.forEach(num => {
+        const button = doc.createElement('button');
+        button.textContent = num;
+        button.style.cssText = 'width:23%;height:50px;font-size:18px;margin:1%;';
+        button.addEventListener('click', () => {
+          if (num === '=') {
+            try {
+              const result = eval(input.value.replace('÷', '/').replace('×', '*'));
+              input.value = result.toString();
+            } catch {
+              input.value = 'Error';
+            }
+          } else {
+            input.value += num;
+          }
+        });
+        buttonContainer.appendChild(button);
+      });
+      
+      head.appendChild(title);
+      body.appendChild(heading);
+      body.appendChild(input);
+      body.appendChild(buttonContainer);
+      html.appendChild(head);
+      html.appendChild(body);
+      
+      doc.appendChild(html);
     }
   }
 

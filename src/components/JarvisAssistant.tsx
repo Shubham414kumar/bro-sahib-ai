@@ -9,6 +9,7 @@ import { MemoryService } from '@/services/MemoryService';
 import { SearchService } from '@/services/SearchService';
 import { SystemService } from '@/services/SystemService';
 import { ReminderService } from '@/services/ReminderService';
+import { SecurityService } from '@/services/SecurityService';
 
 interface ChatMessage {
   id: string;
@@ -58,16 +59,51 @@ export const JarvisAssistant = () => {
 
       // Process commands when active
       if (isActive && transcript) {
+        // Security validation
+        const sanitizedTranscript = SecurityService.sanitizeInput(transcript, 500);
+        if (!sanitizedTranscript) {
+          SecurityService.logSecurityEvent('INVALID_TRANSCRIPT', transcript);
+          return;
+        }
+
+        // Validate command
+        if (!SecurityService.validateCommand(sanitizedTranscript)) {
+          SecurityService.logSecurityEvent('INVALID_COMMAND', sanitizedTranscript);
+          const warningMessage: ChatMessage = {
+            id: Date.now().toString(),
+            text: 'Sorry, that command is not recognized. Please try again.',
+            isUser: false,
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, warningMessage]);
+          speak('Sorry, that command is not recognized.');
+          return;
+        }
+
+        // Check rate limiting
+        if (!SecurityService.checkRateLimit(sanitizedTranscript)) {
+          SecurityService.logSecurityEvent('RATE_LIMIT_EXCEEDED', sanitizedTranscript);
+          const rateLimitMessage: ChatMessage = {
+            id: Date.now().toString(),
+            text: 'Please wait a moment before sending another command.',
+            isUser: false,
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, rateLimitMessage]);
+          speak('Please wait a moment.');
+          return;
+        }
+
         const userMessage: ChatMessage = {
           id: Date.now().toString(),
-          text: transcript,
+          text: sanitizedTranscript,
           isUser: true,
           timestamp: new Date()
         };
         setMessages(prev => [...prev, userMessage]);
 
         // Process the command
-        processCommand(transcript);
+        processCommand(sanitizedTranscript);
       }
     }
   }, [isActive]); // Removed speak and processCommand from dependencies to prevent re-renders
@@ -101,14 +137,14 @@ export const JarvisAssistant = () => {
       const nameMatch = command.match(/naam\s+(.+?)\s+yaad\s+rakho|my\s+name\s+is\s+(.+)/i);
       if (nameMatch) {
         const name = nameMatch[1] || nameMatch[2];
-        MemoryService.saveMemory('user_name', name);
+        await MemoryService.saveMemory('user_name', name);
         response = `Theek hai bro, main yaad rakh lunga ki aapka naam ${name} hai.`;
       } else {
         response = 'Bataiye aapka naam kya hai? Boliye "mera naam [your name] yaad rakho"';
       }
     }
     else if (lowerCommand.includes('mera naam kya hai') || lowerCommand.includes('what is my name')) {
-      const name = MemoryService.getMemory('user_name');
+      const name = await MemoryService.getMemory('user_name');
       response = name 
         ? `Aapka naam ${name} hai, yaad hai mujhe!`
         : 'Sorry bro, mujhe aapka naam yaad nahi hai. Pehle bataiye "mera naam [your name] yaad rakho"';
@@ -148,7 +184,7 @@ export const JarvisAssistant = () => {
       if (reminderMatch) {
         const text = reminderMatch[1] || reminderMatch[3];
         const minutes = parseInt(reminderMatch[2] || reminderMatch[4]);
-        response = ReminderService.setReminder(text, minutes);
+        response = await ReminderService.setReminder(text, minutes);
       } else {
         response = 'Reminder kaise set karu? Boliye "remind me [task] in [number] minutes"';
       }
