@@ -52,6 +52,15 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
+				// JARVIS Theme Colors
+				jarvis: {
+					blue: 'hsl(var(--jarvis-blue))',
+					'blue-light': 'hsl(var(--jarvis-blue-light))',
+					'blue-dark': 'hsl(var(--jarvis-blue-dark))',
+					glow: 'hsl(var(--jarvis-glow))',
+					dark: 'hsl(var(--jarvis-dark))',
+					'dark-light': 'hsl(var(--jarvis-dark-light))'
+				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',

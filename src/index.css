@@ -8,35 +8,52 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* JARVIS Dark Theme */
+    --background: 210 100% 4%;
+    --foreground: 190 100% 90%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 215 100% 6%;
+    --card-foreground: 190 100% 85%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 215 100% 8%;
+    --popover-foreground: 190 100% 85%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 195 100% 60%;
+    --primary-foreground: 210 100% 4%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 215 25% 15%;
+    --secondary-foreground: 190 100% 85%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 215 20% 12%;
+    --muted-foreground: 190 30% 60%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 195 100% 50%;
+    --accent-foreground: 210 100% 4%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 190 100% 90%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 215 25% 20%;
+    --input: 215 25% 15%;
+    --ring: 195 100% 60%;
 
-    --radius: 0.5rem;
+    /* JARVIS Design Tokens */
+    --jarvis-blue: 195 100% 60%;
+    --jarvis-blue-light: 195 100% 70%;
+    --jarvis-blue-dark: 195 100% 40%;
+    --jarvis-glow: 195 100% 50%;
+    --jarvis-dark: 210 100% 4%;
+    --jarvis-dark-light: 215 100% 8%;
+    
+    /* Gradients */
+    --gradient-jarvis: linear-gradient(135deg, hsl(195 100% 60%) 0%, hsl(220 100% 50%) 100%);
+    --gradient-glow: radial-gradient(circle, hsl(195 100% 50% / 0.3) 0%, transparent 70%);
+    
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-glow: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
 
@@ -101,5 +118,54 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   }
+}
+
+/* JARVIS Animations */
+@keyframes glow-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 20px hsl(var(--jarvis-glow) / 0.5);
+  }
+  50% { 
+    box-shadow: 0 0 40px hsl(var(--jarvis-glow) / 0.8), 0 0 60px hsl(var(--jarvis-glow) / 0.4);
+  }
+}
+
+@keyframes voice-wave {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(1.5); }
+}
+
+@keyframes rotate-border {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* JARVIS Custom Classes */
+.jarvis-glow {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.jarvis-voice-wave {
+  animation: voice-wave 0.8s ease-in-out infinite;
+}
+
+.jarvis-border-rotate {
+  animation: rotate-border 3s linear infinite;
+}
+
+.jarvis-fade-in {
+  animation: fade-in-up 0.6s ease-out;
 }
