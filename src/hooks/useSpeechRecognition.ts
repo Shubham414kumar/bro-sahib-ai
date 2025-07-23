@@ -91,14 +91,17 @@ export const useSpeechRecognition = (
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
+      console.log('Speech recognition started');
       setIsListening(true);
     };
 
     recognition.onend = () => {
+      console.log('Speech recognition ended');
       setIsListening(false);
     };
 
     recognition.onresult = (event) => {
+      console.log('Speech recognition result received:', event);
       let finalTranscript = '';
       let interimTranscript = '';
 
@@ -112,9 +115,11 @@ export const useSpeechRecognition = (
       }
 
       const fullTranscript = finalTranscript || interimTranscript;
+      console.log('Full transcript:', fullTranscript);
       setTranscript(fullTranscript);
 
       if (onResult) {
+        console.log('Calling onResult with:', fullTranscript);
         onResult({
           transcript: fullTranscript,
           confidence: event.results[event.results.length - 1]?.[0]?.confidence || 0,

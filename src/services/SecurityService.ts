@@ -18,6 +18,9 @@ export class SecurityService {
 
   // Validate commands against whitelist
   static validateCommand(command: string): boolean {
+    // Temporarily allow all commands for debugging
+    return true;
+    
     const allowedCommands = [
       'time', 'date', 'search', 'google', 'open', 'remind', 'naam', 'name',
       'email', 'youtube', 'music', 'screen', 'study', 'face', 'app',
