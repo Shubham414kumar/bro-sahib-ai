@@ -26,6 +26,7 @@ export const JarvisAssistant = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activeFeatures, setActiveFeatures] = useState<string[]>(['email', 'youtube']);
   const [isMuted, setIsMuted] = useState(false);
+  const [apiKey, setApiKey] = useState<string>('');
   const { toast } = useToast();
 
   const { speak, isSpeaking, stop: stopSpeaking } = useTextToSpeech();
@@ -307,6 +308,13 @@ export const JarvisAssistant = () => {
       });
     }
   };
+
+  // Set API key on mount
+  useEffect(() => {
+    const defaultApiKey = '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';
+    setApiKey(defaultApiKey);
+    SearchService.setApiKey(defaultApiKey);
+  }, []);
 
   // Auto-start listening when component mounts
   useEffect(() => {

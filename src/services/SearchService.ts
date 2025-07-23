@@ -5,6 +5,11 @@ export class SearchService {
   private static readonly MAX_QUERY_LENGTH = 200;
   private static searchHistory: { query: string; timestamp: number }[] = [];
   private static readonly MAX_SEARCHES_PER_MINUTE = 10;
+  private static apiKey: string | null = null;
+
+  static setApiKey(key: string) {
+    this.apiKey = key;
+  }
 
   static async searchWeb(query: string): Promise<string> {
     try {
@@ -20,24 +25,11 @@ export class SearchService {
         return 'Too many searches. Please wait a moment before searching again.';
       }
 
-      // Use secure fetch with timeout
-      const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(sanitizedQuery)}&format=json&no_html=1&skip_disambig=1`;
-      const response = await SecurityService.secureFetch(url);
-      const data = await response.json();
-      
-      // Validate response data
-      if (typeof data !== 'object' || data === null) {
-        throw new Error('Invalid response format');
-      }
-      
-      if (data.Abstract) {
-        return SecurityService.sanitizeInput(data.Abstract, 500);
-      } else if (data.Definition) {
-        return SecurityService.sanitizeInput(data.Definition, 500);
-      } else if (data.Answer) {
-        return SecurityService.sanitizeInput(data.Answer, 500);
+      // Use Perplexity API if available
+      if (this.apiKey) {
+        return await this.searchWithPerplexity(sanitizedQuery);
       } else {
-        return `I searched for "${sanitizedQuery}" but couldn't find a specific answer. You can search manually on Google or DuckDuckGo.`;
+        return 'API key nahi mila. Please API key enter karo search functionality ke liye.';
       }
     } catch (error) {
       SecurityService.logSecurityEvent('SEARCH_ERROR', `${error.message} - Query: ${query}`);
@@ -47,6 +39,54 @@ export class SearchService {
       }
       
       return `Sorry, I couldn't search right now. Please check your internet connection.`;
+    }
+  }
+
+  private static async searchWithPerplexity(query: string): Promise<string> {
+    try {
+      const response = await fetch('https://api.perplexity.ai/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-sonar-small-128k-online',
+          messages: [
+            {
+              role: 'system',
+              content: 'Be precise and concise. Answer in simple language.'
+            },
+            {
+              role: 'user',
+              content: query
+            }
+          ],
+          temperature: 0.2,
+          top_p: 0.9,
+          max_tokens: 500,
+          return_images: false,
+          return_related_questions: false,
+          search_recency_filter: 'month',
+          frequency_penalty: 1,
+          presence_penalty: 0
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.choices && data.choices[0] && data.choices[0].message) {
+        return SecurityService.sanitizeInput(data.choices[0].message.content, 1000);
+      } else {
+        throw new Error('Invalid API response format');
+      }
+    } catch (error) {
+      SecurityService.logSecurityEvent('PERPLEXITY_API_ERROR', `${error.message}`);
+      return `Search API mein problem hai: ${error.message}`;
     }
   }
 
