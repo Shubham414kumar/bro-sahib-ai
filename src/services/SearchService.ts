@@ -25,9 +25,9 @@ export class SearchService {
         return 'Too many searches. Please wait a moment before searching again.';
       }
 
-      // Use Perplexity API if available
+      // Use DeepSeek API if available
       if (this.apiKey) {
-        return await this.searchWithPerplexity(sanitizedQuery);
+        return await this.searchWithDeepSeek(sanitizedQuery);
       } else {
         return 'API key nahi mila. Please API key enter karo search functionality ke liye.';
       }
@@ -42,34 +42,29 @@ export class SearchService {
     }
   }
 
-  private static async searchWithPerplexity(query: string): Promise<string> {
+  private static async searchWithDeepSeek(query: string): Promise<string> {
     try {
-      const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      const response = await fetch('https://api.deepseek.com/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'llama-3.1-sonar-small-128k-online',
+          model: 'deepseek-chat',
           messages: [
             {
               role: 'system',
-              content: 'Be precise and concise. Answer in simple language.'
+              content: 'Be precise and concise. Answer in simple language. You are a helpful assistant that answers questions accurately.'
             },
             {
               role: 'user',
               content: query
             }
           ],
-          temperature: 0.2,
-          top_p: 0.9,
+          temperature: 0.3,
           max_tokens: 500,
-          return_images: false,
-          return_related_questions: false,
-          search_recency_filter: 'month',
-          frequency_penalty: 1,
-          presence_penalty: 0
+          stream: false
         }),
       });
 
@@ -85,7 +80,7 @@ export class SearchService {
         throw new Error('Invalid API response format');
       }
     } catch (error) {
-      SecurityService.logSecurityEvent('PERPLEXITY_API_ERROR', `${error.message}`);
+      SecurityService.logSecurityEvent('DEEPSEEK_API_ERROR', `${error.message}`);
       return `Search API mein problem hai: ${error.message}`;
     }
   }
