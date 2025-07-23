@@ -43,6 +43,8 @@ export class SearchService {
   }
 
   private static async searchWithDeepSeek(query: string): Promise<string> {
+    console.log('DeepSeek API call starting with query:', query);
+    console.log('API Key available:', !!this.apiKey);
     try {
       const response = await fetch('https://api.deepseek.com/chat/completions', {
         method: 'POST',
@@ -68,20 +70,30 @@ export class SearchService {
         }),
       });
 
+      console.log('DeepSeek API response status:', response.status);
+      console.log('DeepSeek API response ok:', response.ok);
+
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        const errorText = await response.text();
+        console.error('DeepSeek API error response:', errorText);
+        throw new Error(`API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('DeepSeek API response data:', data);
       
       if (data.choices && data.choices[0] && data.choices[0].message) {
-        return SecurityService.sanitizeInput(data.choices[0].message.content, 1000);
+        const responseText = SecurityService.sanitizeInput(data.choices[0].message.content, 1000);
+        console.log('DeepSeek response:', responseText);
+        return responseText;
       } else {
+        console.error('Invalid API response format:', data);
         throw new Error('Invalid API response format');
       }
     } catch (error) {
+      console.error('DeepSeek API error details:', error);
       SecurityService.logSecurityEvent('DEEPSEEK_API_ERROR', `${error.message}`);
-      return `Search API mein problem hai: ${error.message}`;
+      return `Search API mein problem hai: ${error.message}. Please check API key aur internet connection.`;
     }
   }
 
