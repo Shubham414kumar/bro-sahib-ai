@@ -115,6 +115,7 @@ export const JarvisAssistant = () => {
   );
 
   const processCommand = async (command: string) => {
+    console.log('Processing command:', command);
     let response = '';
     const lowerCommand = command.toLowerCase();
 
@@ -250,14 +251,17 @@ export const JarvisAssistant = () => {
       response = 'Audio restore ho gaya hai.';
     }
     else {
-      // Enhanced default response with Hinglish
+      // Enhanced default response with Hinglish - for ANY command that doesn't match
+      console.log('No specific command matched, giving default response');
       const hinglishResponses = [
-        `Samjha nahi bro. Main ye kar sakta hun: email, YouTube, face recognition, screen automation, study help, reminders, web search, system commands. Kya chahiye?`,
-        `I heard "${command}". Main ek AI assistant hun jo email, music, apps control kar sakta hun. Aur kya help chahiye?`,
-        `Confuse ho gaya. Try karo: "search something", "open notepad", "remind me task in 5 minutes", ya "mera naam yaad rakho"`
+        `"${command}" - ye samjha nahi bro. Main ye kar sakta hun: time, date, search, reminders, email, YouTube control. Kya chahiye?`,
+        `Mai sun raha hun "${command}". Kuch aur batao - search, time, date, ya koi specific task?`,
+        `"${command}" ka matlab samjha nahi. Try karo: "time batao", "search weather", "remind me in 5 minutes"`
       ];
       response = hinglishResponses[Math.floor(Math.random() * hinglishResponses.length)];
     }
+
+    console.log('Generated response:', response);
 
     // Add AI response to chat
     const aiMessage: ChatMessage = {
@@ -270,7 +274,10 @@ export const JarvisAssistant = () => {
 
     // Speak response if not muted
     if (!isMuted && response) {
+      console.log('Speaking response:', response);
       speak(response);
+    } else {
+      console.log('Not speaking - muted:', isMuted, 'response:', !!response);
     }
   };
 
