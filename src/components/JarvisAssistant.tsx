@@ -39,9 +39,12 @@ export const JarvisAssistant = () => {
   const handleSpeechResult = useCallback((result: any) => {
     if (result.isFinal) {
       const transcript = result.transcript.toLowerCase().trim();
+      console.log('🎤 Speech Result:', transcript);
+      console.log('🤖 Is Active:', isActive);
       
       // Check for wake phrase
       if (!isActive && WAKE_PHRASES.some(phrase => transcript.includes(phrase))) {
+        console.log('🚀 Wake phrase detected!');
         setIsActive(true);
         const hinglishGreeting = Math.random() > 0.5 
           ? 'Hello bro! JARVIS active ho gaya hai. Kya kaam hai?'
@@ -60,15 +63,22 @@ export const JarvisAssistant = () => {
 
       // Process commands when active
       if (isActive && transcript) {
+        console.log('✅ Processing command since JARVIS is active');
         // Security validation
         const sanitizedTranscript = SecurityService.sanitizeInput(transcript, 500);
+        console.log('🔒 Sanitized transcript:', sanitizedTranscript);
         if (!sanitizedTranscript) {
+          console.log('❌ Invalid transcript');
           SecurityService.logSecurityEvent('INVALID_TRANSCRIPT', transcript);
           return;
         }
 
         // Validate command
-        if (!SecurityService.validateCommand(sanitizedTranscript)) {
+        console.log('🔍 Validating command...');
+        const isValidCommand = SecurityService.validateCommand(sanitizedTranscript);
+        console.log('✔️ Command validation result:', isValidCommand);
+        if (!isValidCommand) {
+          console.log('❌ Command not valid');
           SecurityService.logSecurityEvent('INVALID_COMMAND', sanitizedTranscript);
           const warningMessage: ChatMessage = {
             id: Date.now().toString(),
