@@ -130,7 +130,7 @@ export const JarvisAssistant = () => {
     const lowerCommand = command.toLowerCase();
 
     // Enhanced command processing with Hinglish support
-    if (lowerCommand.includes('time') || lowerCommand.includes('samay')) {
+    if (lowerCommand.includes('time') || lowerCommand.includes('samay') || lowerCommand.includes('btao') || lowerCommand.includes('bata')) {
       const now = new Date();
       const hinglishTime = Math.random() > 0.5 
         ? `Abhi time hai ${now.toLocaleTimeString()}`
