@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { VoiceVisualizer } from './VoiceVisualizer';
 import { ChatHistory } from './ChatHistory';
 import { ControlPanel } from './ControlPanel';
+import { LoginPanel } from './LoginPanel';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +23,8 @@ interface ChatMessage {
 const WAKE_PHRASES = ['hey bro', 'hai bro', 'हे ब्रो', 'हाय ब्रो'];
 
 export const JarvisAssistant = () => {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ name: string; email: string } | null>(null);
   const [isActive, setIsActive] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activeFeatures, setActiveFeatures] = useState<string[]>(['email', 'youtube']);
@@ -31,8 +34,14 @@ export const JarvisAssistant = () => {
 
   const { speak, isSpeaking, stop: stopSpeaking } = useTextToSpeech();
 
-  // Request notification permission on mount
+  // Check if user is already logged in on mount
   useEffect(() => {
+    const storedUser = localStorage.getItem('jarvis_user');
+    if (storedUser) {
+      const userData = JSON.parse(storedUser);
+      setCurrentUser(userData);
+      setIsLoggedIn(true);
+    }
     ReminderService.requestNotificationPermission();
   }, []);
 
@@ -342,16 +351,51 @@ export const JarvisAssistant = () => {
     return () => clearTimeout(timer);
   }, []); // Empty dependency array to run only once on mount
 
+  const handleLogin = (userData: { name: string; email: string }) => {
+    setCurrentUser(userData);
+    setIsLoggedIn(true);
+    toast({
+      title: 'Welcome to JARVIS!',
+      description: `Hello ${userData.name}, system ready hai`
+    });
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('jarvis_user');
+    setCurrentUser(null);
+    setIsLoggedIn(false);
+    setIsActive(false);
+    setMessages([]);
+    toast({
+      title: 'Logged Out',
+      description: 'JARVIS se logout ho gaye'
+    });
+  };
+
+  // Show login panel if not logged in
+  if (!isLoggedIn) {
+    return <LoginPanel onLogin={handleLogin} />;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-jarvis-dark via-jarvis-dark-light to-jarvis-dark p-4">
       <div className="container mx-auto max-w-7xl">
         {/* Header */}
         <div className="text-center mb-8 jarvis-fade-in">
-          <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-jarvis-blue to-jarvis-blue-light bg-clip-text text-transparent mb-2">
-            JARVIS
-          </h1>
+          <div className="flex justify-between items-center mb-4">
+            <div></div>
+            <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-jarvis-blue to-jarvis-blue-light bg-clip-text text-transparent">
+              JARVIS
+            </h1>
+            <button
+              onClick={handleLogout}
+              className="text-jarvis-blue hover:text-jarvis-blue-light text-sm transition-colors"
+            >
+              Logout
+            </button>
+          </div>
           <p className="text-muted-foreground text-lg">
-            Enhanced AI Voice Assistant - {isActive ? 'Active' : 'Standby Mode'}
+            Welcome {currentUser?.name} - {isActive ? 'Active' : 'Standby Mode'}
           </p>
           <p className="text-xs text-jarvis-blue-light mt-2">
             Features: Voice I/O • System Commands • Web Search • Memory • Reminders • Hinglish Support
