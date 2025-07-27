@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { VoiceVisualizer } from './VoiceVisualizer';
 import { ChatHistory } from './ChatHistory';
 import { ControlPanel } from './ControlPanel';
-import { LoginPanel } from './LoginPanel';
+import { ProfessionalLoginPanel } from './ProfessionalLoginPanel';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import { useToast } from '@/hooks/use-toast';
@@ -374,7 +374,7 @@ export const JarvisAssistant = () => {
 
   // Show login panel if not logged in
   if (!isLoggedIn) {
-    return <LoginPanel onLogin={handleLogin} />;
+    return <ProfessionalLoginPanel onLogin={handleLogin} />;
   }
 
   return (
