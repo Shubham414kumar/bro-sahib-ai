@@ -188,9 +188,14 @@ export const JarvisAssistant = () => {
         
         if (!isMuted) speak(response);
         
-        // Perform search
-        const searchResult = await SearchService.searchWeb(query);
-        response = `Search result: ${searchResult}`;
+        try {
+          // Perform search
+          const searchResult = await SearchService.searchWeb(query);
+          response = `Search result: ${searchResult}`;
+        } catch (error) {
+          console.error('Search error:', error);
+          response = `Sorry bro, search mein problem aa rahi hai. Try karo: "time batao" ya "mera naam kya hai"`;
+        }
       } else {
         response = 'Kya search karna hai? Boliye "search [your query]"';
       }
@@ -275,7 +280,9 @@ export const JarvisAssistant = () => {
       const hinglishResponses = [
         `"${command}" - ye samjha nahi bro. Main ye kar sakta hun: time, date, search, reminders, email, YouTube control. Kya chahiye?`,
         `Mai sun raha hun "${command}". Kuch aur batao - search, time, date, ya koi specific task?`,
-        `"${command}" ka matlab samjha nahi. Try karo: "time batao", "search weather", "remind me in 5 minutes"`
+        `"${command}" ka matlab samjha nahi. Try karo: "time batao", "search weather", "remind me in 5 minutes"`,
+        `Hello bro! "${command}" samjha nahi. Time, date, search, reminders - ye sab kar sakta hun. Kya chahiye?`,
+        `Bro, "${command}" clear nahi hai. Main active hun - time batao, search karo, ya reminder set karo!`
       ];
       response = hinglishResponses[Math.floor(Math.random() * hinglishResponses.length)];
     }
