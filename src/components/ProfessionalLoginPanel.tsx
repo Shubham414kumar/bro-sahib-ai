@@ -120,7 +120,10 @@ export const ProfessionalLoginPanel: React.FC<ProfessionalLoginPanelProps> = ({ 
         description: 'Welcome back!'
       });
 
-      onLogin({ name: '', email });
+      // Store user data locally
+      const userData = { name: name || email.split('@')[0], email };
+      localStorage.setItem('jarvis_user', JSON.stringify(userData));
+      onLogin(userData);
     } catch (error: any) {
       toast({
         title: 'Login Failed',
@@ -148,7 +151,10 @@ export const ProfessionalLoginPanel: React.FC<ProfessionalLoginPanelProps> = ({ 
         description: 'Welcome to JARVIS!'
       });
 
-      onLogin({ name, email });
+      // Store user data locally and login
+      const userData = { name: name || email.split('@')[0], email };
+      localStorage.setItem('jarvis_user', JSON.stringify(userData));
+      onLogin(userData);
     } catch (error: any) {
       toast({
         title: 'Verification Failed',

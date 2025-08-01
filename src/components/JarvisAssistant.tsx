@@ -46,8 +46,10 @@ export const JarvisAssistant = () => {
   }, []);
 
   const handleSpeechResult = useCallback((result: any) => {
+    console.log('Speech result received:', result);
     if (result.isFinal) {
       const transcript = result.transcript.toLowerCase().trim();
+      console.log('Processing transcript:', transcript);
       console.log('🎤 Speech Result:', transcript);
       console.log('🤖 Is Active:', isActive);
       
@@ -128,9 +130,9 @@ export const JarvisAssistant = () => {
     }
   }, [isActive]); // Removed speak and processCommand from dependencies to prevent re-renders
 
-  const { isListening, startListening, stopListening } = useSpeechRecognition(
+  const { isListening, startListening, stopListening, isSupported: speechSupported } = useSpeechRecognition(
     handleSpeechResult,
-    'en-US'
+    'hi-IN'
   );
 
   const processCommand = async (command: string) => {
