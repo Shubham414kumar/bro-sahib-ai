@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { VoiceVisualizer } from './VoiceVisualizer';
 import { ChatHistory } from './ChatHistory';
 import { ControlPanel } from './ControlPanel';
@@ -34,15 +35,68 @@ export const JarvisAssistant = () => {
 
   const { speak, isSpeaking, stop: stopSpeaking } = useTextToSpeech();
 
-  // Check if user is already logged in on mount
+  // Check authentication state and load user data
   useEffect(() => {
-    const storedUser = localStorage.getItem('jarvis_user');
-    if (storedUser) {
-      const userData = JSON.parse(storedUser);
-      setCurrentUser(userData);
-      setIsLoggedIn(true);
-    }
+    const checkAuthState = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        // Fetch profile from database
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+
+        const userData = {
+          name: profile?.full_name || session.user.email?.split('@')[0] || 'User',
+          email: session.user.email || ''
+        };
+
+        setCurrentUser(userData);
+        setIsLoggedIn(true);
+        localStorage.setItem('jarvis_user', JSON.stringify(userData));
+      } else {
+        // Check localStorage as fallback
+        const storedUser = localStorage.getItem('jarvis_user');
+        if (storedUser) {
+          const userData = JSON.parse(storedUser);
+          setCurrentUser(userData);
+          setIsLoggedIn(true);
+        }
+      }
+    };
+
+    checkAuthState();
     ReminderService.requestNotificationPermission();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        setTimeout(async () => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+
+          const userData = {
+            name: profile?.full_name || session.user.email?.split('@')[0] || 'User',
+            email: session.user.email || ''
+          };
+
+          setCurrentUser(userData);
+          setIsLoggedIn(true);
+          localStorage.setItem('jarvis_user', JSON.stringify(userData));
+        }, 0);
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        setIsLoggedIn(false);
+        localStorage.removeItem('jarvis_user');
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleSpeechResult = useCallback((result: any) => {
@@ -369,16 +423,23 @@ export const JarvisAssistant = () => {
     });
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('jarvis_user');
-    setCurrentUser(null);
-    setIsLoggedIn(false);
-    setIsActive(false);
-    setMessages([]);
-    toast({
-      title: 'Logged Out',
-      description: 'JARVIS se logout ho gaye'
-    });
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setCurrentUser(null);
+      setIsLoggedIn(false);
+      localStorage.removeItem('jarvis_user');
+      toast({
+        title: 'Logged out successfully',
+        description: 'See you soon!'
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force logout even if Supabase fails
+      setCurrentUser(null);
+      setIsLoggedIn(false);
+      localStorage.removeItem('jarvis_user');
+    }
   };
 
   // Show login panel if not logged in

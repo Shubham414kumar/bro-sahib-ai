@@ -78,16 +78,33 @@ export const ProfessionalLoginPanel: React.FC<ProfessionalLoginPanelProps> = ({ 
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
-          data: { name }
+          data: { 
+            full_name: name,
+            name: name 
+          }
         }
       });
 
       if (error) throw error;
+
+      // Create profile in database
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: data.user.id,
+            full_name: name
+          });
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+        }
+      }
 
       setIsOtpStep(true);
       toast({
@@ -108,22 +125,34 @@ export const ProfessionalLoginPanel: React.FC<ProfessionalLoginPanelProps> = ({ 
   const handleEmailLogin = async () => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
 
       if (error) throw error;
 
-      toast({
-        title: 'Login Successful',
-        description: 'Welcome back!'
-      });
+      // Fetch user profile from database
+      if (data.user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', data.user.id)
+          .maybeSingle();
 
-      // Store user data locally
-      const userData = { name: name || email.split('@')[0], email };
-      localStorage.setItem('jarvis_user', JSON.stringify(userData));
-      onLogin(userData);
+        const userData = {
+          name: profile?.full_name || email.split('@')[0],
+          email: data.user.email || email
+        };
+
+        localStorage.setItem('jarvis_user', JSON.stringify(userData));
+        onLogin(userData);
+
+        toast({
+          title: 'Login Successful',
+          description: 'Welcome back!'
+        });
+      }
     } catch (error: any) {
       toast({
         title: 'Login Failed',
@@ -151,10 +180,34 @@ export const ProfessionalLoginPanel: React.FC<ProfessionalLoginPanelProps> = ({ 
         description: 'Welcome to JARVIS!'
       });
 
-      // Store user data locally and login
-      const userData = { name: name || email.split('@')[0], email };
-      localStorage.setItem('jarvis_user', JSON.stringify(userData));
-      onLogin(userData);
+      // Get user session and create profile if needed
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        // Check if profile exists
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+
+        if (!profile && !profileError) {
+          // Create profile if it doesn't exist
+          await supabase
+            .from('profiles')
+            .insert({
+              user_id: session.user.id,
+              full_name: name
+            });
+        }
+
+        const userData = {
+          name: profile?.full_name || name || email.split('@')[0],
+          email: session.user.email || email
+        };
+
+        localStorage.setItem('jarvis_user', JSON.stringify(userData));
+        onLogin(userData);
+      }
     } catch (error: any) {
       toast({
         title: 'Verification Failed',
