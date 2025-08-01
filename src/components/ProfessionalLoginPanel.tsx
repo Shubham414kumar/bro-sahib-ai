@@ -78,6 +78,7 @@ export const ProfessionalLoginPanel: React.FC<ProfessionalLoginPanelProps> = ({ 
 
     setIsLoading(true);
     try {
+      console.log('Starting signup process...');
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -90,31 +91,26 @@ export const ProfessionalLoginPanel: React.FC<ProfessionalLoginPanelProps> = ({ 
         }
       });
 
-      if (error) throw error;
+      console.log('Signup response:', { data, error });
 
-      // Create profile in database
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            user_id: data.user.id,
-            full_name: name
-          });
-
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-        }
+      if (error) {
+        console.error('Signup error:', error);
+        throw error;
       }
 
+      // Don't try to create profile here - let the trigger handle it
+      console.log('Signup successful, moving to OTP step');
+      
       setIsOtpStep(true);
       toast({
         title: 'Verification Required',
         description: 'Please check your email for the verification code.'
       });
     } catch (error: any) {
+      console.error('Signup failed:', error);
       toast({
         title: 'Signup Failed',
-        description: error.message,
+        description: error.message || 'Something went wrong during signup',
         variant: 'destructive'
       });
     } finally {
