@@ -49,9 +49,10 @@ export const ProfessionalLoginPanel: React.FC<ProfessionalLoginPanelProps> = ({ 
   const passwordValidation = validatePassword(password);
 
   const handleEmailSignup = async () => {
-    console.log('Signup button clicked');
+    console.log('🚀 Signup button clicked');
     
     if (!name.trim()) {
+      console.log('❌ Name validation failed');
       toast({
         title: 'Name Required',
         description: 'Please enter your name.',
@@ -61,6 +62,7 @@ export const ProfessionalLoginPanel: React.FC<ProfessionalLoginPanelProps> = ({ 
     }
 
     if (!email.trim()) {
+      console.log('❌ Email validation failed');
       toast({
         title: 'Email Required',
         description: 'Please enter your email.',
@@ -70,6 +72,7 @@ export const ProfessionalLoginPanel: React.FC<ProfessionalLoginPanelProps> = ({ 
     }
 
     if (!acceptTerms) {
+      console.log('❌ Terms validation failed');
       toast({
         title: 'Terms & Conditions Required',
         description: 'Please accept the terms and conditions to continue.',
@@ -79,6 +82,7 @@ export const ProfessionalLoginPanel: React.FC<ProfessionalLoginPanelProps> = ({ 
     }
 
     if (!passwordValidation.isStrong) {
+      console.log('❌ Password strength validation failed');
       toast({
         title: 'Weak Password',
         description: 'Please create a stronger password.',
@@ -88,6 +92,7 @@ export const ProfessionalLoginPanel: React.FC<ProfessionalLoginPanelProps> = ({ 
     }
 
     if (password !== confirmPassword) {
+      console.log('❌ Password match validation failed');
       toast({
         title: 'Password Mismatch',
         description: 'Passwords do not match.',
@@ -96,50 +101,72 @@ export const ProfessionalLoginPanel: React.FC<ProfessionalLoginPanelProps> = ({ 
       return;
     }
 
+    console.log('✅ All validations passed, starting signup');
     setIsLoading(true);
-    console.log('Starting signup with:', { email, name, passwordLength: password.length });
-
+    
     try {
-      // Simple signup without immediate profile creation
+      // Clean up any existing auth state first
+      console.log('🧹 Cleaning up existing auth state');
+      await supabase.auth.signOut();
+      
+      console.log('📧 Attempting Supabase signup with email:', email);
+      
       const signupResponse = await supabase.auth.signUp({
         email: email.trim(),
         password: password,
         options: {
+          emailRedirectTo: `${window.location.origin}/`,
           data: { 
             full_name: name.trim()
           }
         }
       });
 
-      console.log('Supabase signup response:', signupResponse);
+      console.log('📨 Supabase signup response:', {
+        user: signupResponse.data?.user?.id,
+        session: !!signupResponse.data?.session,
+        error: signupResponse.error?.message
+      });
 
       if (signupResponse.error) {
-        console.error('Supabase signup error:', signupResponse.error);
-        throw signupResponse.error;
+        console.error('❌ Supabase signup error:', signupResponse.error);
+        throw new Error(`Signup failed: ${signupResponse.error.message}`);
       }
 
-      if (signupResponse.data?.user) {
-        console.log('User created successfully:', signupResponse.data.user.id);
-        
-        // Check if email confirmation is required
-        if (!signupResponse.data.user.email_confirmed_at) {
-          setIsOtpStep(true);
-          toast({
-            title: 'Email Verification Required',
-            description: 'Please check your email for the verification code.'
-          });
-        } else {
-          // User is immediately confirmed
-          toast({
-            title: 'Account Created',
-            description: 'Welcome to JARVIS!'
-          });
-          onLogin({ name: name.trim(), email: email.trim() });
-        }
+      if (!signupResponse.data?.user) {
+        console.error('❌ No user data returned from signup');
+        throw new Error('No user data returned from signup');
       }
+
+      const user = signupResponse.data.user;
+      console.log('✅ User created successfully:', user.id);
+      
+      // Check if email confirmation is required
+      if (!user.email_confirmed_at) {
+        console.log('📬 Email confirmation required');
+        setIsOtpStep(true);
+        toast({
+          title: 'Email Verification Required',
+          description: 'Please check your email for the verification code.'
+        });
+      } else {
+        console.log('✅ User immediately confirmed, logging in');
+        toast({
+          title: 'Account Created',
+          description: 'Welcome to JARVIS!'
+        });
+        onLogin({ name: name.trim(), email: email.trim() });
+      }
+      
     } catch (error: any) {
-      console.error('Full signup error:', error);
-      let errorMessage = 'Something went wrong during signup';
+      console.error('💥 Signup process failed:', error);
+      console.error('Error details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      });
+      
+      let errorMessage = 'Something went wrong during signup. Please try again.';
       
       if (error.message) {
         errorMessage = error.message;
@@ -152,6 +179,7 @@ export const ProfessionalLoginPanel: React.FC<ProfessionalLoginPanelProps> = ({ 
       });
     } finally {
       setIsLoading(false);
+      console.log('🏁 Signup process completed');
     }
   };
 
