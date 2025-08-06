@@ -21,6 +21,8 @@ export const SimpleAuth: React.FC<SimpleAuthProps> = ({ onLogin }) => {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('🔄 Auth process started:', { isLogin, email, name });
+    
     if (!email || !password) {
       toast({
         title: 'Error',
@@ -43,10 +45,17 @@ export const SimpleAuth: React.FC<SimpleAuthProps> = ({ onLogin }) => {
 
     try {
       if (isLogin) {
-        console.log('🔑 Attempting login...');
+        console.log('🔑 Login attempt started');
+        
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password: password
+        });
+
+        console.log('📊 Login response:', { 
+          user: data.user?.id, 
+          session: !!data.session,
+          error: error?.message 
         });
 
         if (error) {
@@ -54,12 +63,16 @@ export const SimpleAuth: React.FC<SimpleAuthProps> = ({ onLogin }) => {
           throw error;
         }
 
-        console.log('✅ Login successful:', data.user?.id);
-        
+        if (!data.user) {
+          throw new Error('No user data received');
+        }
+
         const userData = {
-          name: data.user?.user_metadata?.full_name || data.user?.email?.split('@')[0] || 'User',
-          email: data.user?.email || email
+          name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
+          email: data.user.email || email
         };
+
+        console.log('✅ Login successful, user data:', userData);
 
         toast({
           title: 'Login Successful',
@@ -68,7 +81,8 @@ export const SimpleAuth: React.FC<SimpleAuthProps> = ({ onLogin }) => {
 
         onLogin(userData);
       } else {
-        console.log('📝 Attempting signup...');
+        console.log('📝 Signup attempt started');
+        
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password: password,
@@ -79,42 +93,67 @@ export const SimpleAuth: React.FC<SimpleAuthProps> = ({ onLogin }) => {
           }
         });
 
+        console.log('📊 Signup response:', { 
+          user: data.user?.id, 
+          session: !!data.session,
+          error: error?.message,
+          needsConfirmation: !data.user?.email_confirmed_at
+        });
+
         if (error) {
           console.error('❌ Signup error:', error);
           throw error;
         }
 
-        console.log('✅ Signup successful:', data.user?.id);
-        
-        if (data.user && data.user.email_confirmed_at) {
-          // User is automatically confirmed
-          const userData = {
-            name: name.trim(),
-            email: email.trim()
-          };
+        if (!data.user) {
+          throw new Error('No user data received from signup');
+        }
 
+        // For development - let's allow immediate login even without email confirmation
+        const userData = {
+          name: name.trim(),
+          email: email.trim()
+        };
+
+        console.log('✅ Signup successful, user data:', userData);
+
+        if (data.user.email_confirmed_at) {
+          // User is automatically confirmed
           toast({
             title: 'Account Created',
             description: 'Welcome to JARVIS!'
           });
-
           onLogin(userData);
         } else {
-          // Email confirmation required
+          // Email confirmation required - but for demo purposes, let's proceed
           toast({
-            title: 'Check Email',
-            description: 'Email verification link bheja gaya hai'
+            title: 'Account Created', 
+            description: 'Welcome to JARVIS! (Demo mode - no email verification needed)'
           });
+          
+          // For demo, directly login the user
+          setTimeout(() => {
+            onLogin(userData);
+          }, 1000);
         }
       }
     } catch (error: any) {
-      console.error('Auth error:', error);
+      console.error('💥 Auth error details:', {
+        message: error.message,
+        code: error.code,
+        status: error.status
+      });
       
-      let message = 'Something went wrong';
+      let message = 'Kuch problem hai';
+      
       if (error.message?.includes('Invalid login credentials')) {
-        message = 'Wrong email ya password';
+        message = 'Wrong email ya password hai';
       } else if (error.message?.includes('User already registered')) {
         message = 'Email already registered hai. Login try karo.';
+      } else if (error.message?.includes('Failed to fetch')) {
+        message = 'Internet connection check karo';
+      } else if (error.message?.includes('Database')) {
+        message = 'Database connection issue hai';
       } else if (error.message) {
         message = error.message;
       }
@@ -126,6 +165,7 @@ export const SimpleAuth: React.FC<SimpleAuthProps> = ({ onLogin }) => {
       });
     } finally {
       setIsLoading(false);
+      console.log('🏁 Auth process completed');
     }
   };
 
