@@ -1,10 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+
+// Create a new Supabase client to avoid any initialization issues
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = "https://ohigiedhjuqdlbohvssp.supabase.co";
+const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oaWdpZWRoanVxZGxib2h2c3NwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1Mjc0OTEsImV4cCI6MjA2OTEwMzQ5MX0.l2WZxLVdDoqEgYEOFxZNz8IfLVoYFyI4a9rhJc5DAM8";
+
+const authClient = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    storage: localStorage,
+    persistSession: true,
+    autoRefreshToken: true,
+  }
+});
 
 interface SimpleAuthProps {
   onLogin: (userData: { name: string; email: string }) => void;
@@ -18,23 +31,37 @@ export const SimpleAuth: React.FC<SimpleAuthProps> = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
+  useEffect(() => {
+    // Clean up any existing auth state
+    const cleanAuthState = () => {
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+          localStorage.removeItem(key);
+        }
+      });
+    };
+    
+    cleanAuthState();
+    console.log('🧹 Auth state cleaned');
+  }, []);
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('🔄 Auth process started:', { isLogin, email, name });
+    console.log('🔄 Starting auth with fresh client');
     
-    if (!email || !password) {
+    if (!email.trim() || !password.trim()) {
       toast({
-        title: 'Error',
+        title: 'Required Fields',
         description: 'Email aur password dalno',
         variant: 'destructive'
       });
       return;
     }
 
-    if (!isLogin && !name) {
+    if (!isLogin && !name.trim()) {
       toast({
-        title: 'Error', 
+        title: 'Required Fields', 
         description: 'Naam bhi dalno',
         variant: 'destructive'
       });
@@ -44,118 +71,104 @@ export const SimpleAuth: React.FC<SimpleAuthProps> = ({ onLogin }) => {
     setIsLoading(true);
 
     try {
-      if (isLogin) {
-        console.log('🔑 Login attempt started');
-        
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password: password
-        });
+      // Force signout any existing session first
+      try {
+        await authClient.auth.signOut({ scope: 'global' });
+      } catch (signoutError) {
+        console.log('Signout error (ignoring):', signoutError);
+      }
 
-        console.log('📊 Login response:', { 
-          user: data.user?.id, 
-          session: !!data.session,
-          error: error?.message 
+      if (isLogin) {
+        console.log('🔑 Attempting login...');
+        
+        const { data, error } = await authClient.auth.signInWithPassword({
+          email: email.trim(),
+          password: password.trim()
         });
 
         if (error) {
-          console.error('❌ Login error:', error);
+          console.error('❌ Login failed:', error);
           throw error;
         }
 
         if (!data.user) {
-          throw new Error('No user data received');
+          throw new Error('No user returned');
         }
 
         const userData = {
           name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
-          email: data.user.email || email
+          email: data.user.email || email.trim()
         };
 
-        console.log('✅ Login successful, user data:', userData);
-
+        console.log('✅ Login success');
+        
         toast({
-          title: 'Login Successful',
-          description: 'Welcome back!'
+          title: 'Success',
+          description: 'Login ho gaya!'
         });
 
-        onLogin(userData);
+        // Small delay to ensure state is updated
+        setTimeout(() => {
+          onLogin(userData);
+        }, 100);
+
       } else {
-        console.log('📝 Signup attempt started');
+        console.log('📝 Attempting signup...');
         
-        const { data, error } = await supabase.auth.signUp({
+        const redirectUrl = `${window.location.origin}/`;
+        
+        const { data, error } = await authClient.auth.signUp({
           email: email.trim(),
-          password: password,
+          password: password.trim(),
           options: {
             data: {
               full_name: name.trim()
-            }
+            },
+            emailRedirectTo: redirectUrl
           }
         });
 
-        console.log('📊 Signup response:', { 
-          user: data.user?.id, 
-          session: !!data.session,
-          error: error?.message,
-          needsConfirmation: !data.user?.email_confirmed_at
-        });
-
         if (error) {
-          console.error('❌ Signup error:', error);
+          console.error('❌ Signup failed:', error);
           throw error;
         }
 
         if (!data.user) {
-          throw new Error('No user data received from signup');
+          throw new Error('No user returned from signup');
         }
 
-        // For development - let's allow immediate login even without email confirmation
         const userData = {
           name: name.trim(),
           email: email.trim()
         };
 
-        console.log('✅ Signup successful, user data:', userData);
+        console.log('✅ Signup success');
 
-        if (data.user.email_confirmed_at) {
-          // User is automatically confirmed
-          toast({
-            title: 'Account Created',
-            description: 'Welcome to JARVIS!'
-          });
+        toast({
+          title: 'Success',
+          description: 'Account ban gaya!'
+        });
+
+        // For demo purposes, proceed without email confirmation
+        setTimeout(() => {
           onLogin(userData);
-        } else {
-          // Email confirmation required - but for demo purposes, let's proceed
-          toast({
-            title: 'Account Created', 
-            description: 'Welcome to JARVIS! (Demo mode - no email verification needed)'
-          });
-          
-          // For demo, directly login the user
-          setTimeout(() => {
-            onLogin(userData);
-          }, 1000);
-        }
+        }, 100);
       }
     } catch (error: any) {
-      console.error('💥 Auth error details:', {
-        message: error.message,
-        code: error.code,
-        status: error.status
-      });
+      console.error('💥 Auth error:', error);
       
-      let message = 'Kuch problem hai';
+      let message = 'Something went wrong';
       
       if (error.message?.includes('Invalid login credentials')) {
-        message = 'Wrong email ya password hai';
-      } else if (error.message?.includes('User already registered')) {
-        message = 'Email already registered hai. Login try karo.';
-      } else if (error.message?.includes('Failed to fetch')) {
-        message = 'Internet connection check karo';
-      } else if (error.message?.includes('Database')) {
-        message = 'Database connection issue hai';
-      } else if (error.message) {
-        message = error.message;
+        message = 'Wrong email ya password';
+      } else if (error.message?.includes('already registered')) {
+        message = 'Email already exists. Login karo.';
+      } else if (error.message?.includes('fetch')) {
+        message = 'Network error - internet check karo';
+      } else if (error.code === 'invalid_credentials') {
+        message = 'Email ya password galat hai';
+      } else {
+        message = error.message || 'Unknown error';
       }
 
       toast({
@@ -165,7 +178,6 @@ export const SimpleAuth: React.FC<SimpleAuthProps> = ({ onLogin }) => {
       });
     } finally {
       setIsLoading(false);
-      console.log('🏁 Auth process completed');
     }
   };
 
