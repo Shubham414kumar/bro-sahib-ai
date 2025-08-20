@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { VoiceVisualizer } from './VoiceVisualizer';
 import { ChatHistory } from './ChatHistory';
 import { ControlPanel } from './ControlPanel';
-import { SimpleAuth } from './SimpleAuth';
+import { FreshAuthPanel } from './FreshAuthPanel';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import { useToast } from '@/hooks/use-toast';
@@ -444,7 +444,7 @@ export const JarvisAssistant = () => {
 
   // Show login panel if not logged in
   if (!isLoggedIn) {
-    return <SimpleAuth onLogin={handleLogin} />;
+    return <FreshAuthPanel onLogin={handleLogin} />;
   }
 
   return (
