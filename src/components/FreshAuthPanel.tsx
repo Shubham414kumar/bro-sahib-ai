@@ -68,77 +68,49 @@ export const FreshAuthPanel: React.FC<FreshAuthPanelProps> = ({ onLogin }) => {
     setIsLoading(true);
 
     try {
-      if (isSignUp) {
-        // Sign up new user
-        const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.functions.invoke('auth', {
+        body: {
+          action: isSignUp ? 'signup' : 'login',
           email: email.trim(),
           password: password.trim(),
-          options: {
-            data: {
-              full_name: fullName.trim()
-            },
-            emailRedirectTo: `${window.location.origin}/`
-          }
-        });
-
-        if (error) throw error;
-
-        if (data.user) {
-          toast({
-            title: 'Success!',
-            description: 'Account ban gaya! Login kar sakte hain ab.'
-          });
-          
-          // Switch to login mode
-          setIsSignUp(false);
-          setPassword('');
-          setFullName('');
+          fullName: fullName.trim()
         }
-      } else {
-        // Sign in existing user
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password: password.trim()
-        });
+      });
 
-        if (error) throw error;
-
-        if (data.user) {
-          const userData = {
-            name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
-            email: data.user.email || email.trim()
-          };
-
-          toast({
-            title: 'Welcome!',
-            description: `Hello ${userData.name}! JARVIS ready hai.`
-          });
-
-          onLogin(userData);
-        }
+      if (error) {
+        throw new Error(error.message || 'Function call failed');
       }
-    } catch (error: any) {
-      console.error('Auth error:', error);
-      
-      let message = 'Kuch galat ho gaya';
-      
-      if (error.message?.includes('Invalid login credentials')) {
-        message = 'Email ya password galat hai';
-      } else if (error.message?.includes('already registered')) {
-        message = 'Email already exist karta hai. Login karo.';
-      } else if (error.message?.includes('User already registered')) {
-        message = 'User already registered hai. Login karo.';
-      } else if (error.message?.includes('Email not confirmed')) {
-        message = 'Email confirm nahi hai. Check your inbox.';
-      } else if (error.message?.includes('fetch')) {
-        message = 'Internet connection check karo';
-      } else {
-        message = error.message || 'Unknown error';
+
+      if (data.error) {
+        throw new Error(data.message);
       }
 
       toast({
+        title: 'Success!',
+        description: data.message
+      });
+
+      if (isSignUp) {
+        // Switch to login mode after successful signup
+        setIsSignUp(false);
+        setPassword('');
+        setFullName('');
+      } else {
+        // Login successful, call onLogin
+        if (data.user) {
+          onLogin({
+            name: data.user.name,
+            email: data.user.email
+          });
+        }
+      }
+
+    } catch (error: any) {
+      console.error('Auth error:', error);
+      
+      toast({
         title: 'Error',
-        description: message,
+        description: error.message || 'Kuch galat ho gaya',
         variant: 'destructive'
       });
     } finally {
