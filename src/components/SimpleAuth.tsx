@@ -5,19 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 
-// Create a new Supabase client to avoid any initialization issues
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = "https://ohigiedhjuqdlbohvssp.supabase.co";
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oaWdpZWRoanVxZGxib2h2c3NwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1Mjc0OTEsImV4cCI6MjA2OTEwMzQ5MX0.l2WZxLVdDoqEgYEOFxZNz8IfLVoYFyI4a9rhJc5DAM8";
-
-const authClient = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-  }
-});
+// Use the shared Supabase client
+import { supabase } from '@/integrations/supabase/client';
 
 interface SimpleAuthProps {
   onLogin: (userData: { name: string; email: string }) => void;
@@ -73,7 +62,7 @@ export const SimpleAuth: React.FC<SimpleAuthProps> = ({ onLogin }) => {
     try {
       // Force signout any existing session first
       try {
-        await authClient.auth.signOut({ scope: 'global' });
+        await supabase.auth.signOut({ scope: 'global' });
       } catch (signoutError) {
         console.log('Signout error (ignoring):', signoutError);
       }
@@ -81,7 +70,7 @@ export const SimpleAuth: React.FC<SimpleAuthProps> = ({ onLogin }) => {
       if (isLogin) {
         console.log('🔑 Attempting login...');
         
-        const { data, error } = await authClient.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password: password.trim()
         });
@@ -117,7 +106,7 @@ export const SimpleAuth: React.FC<SimpleAuthProps> = ({ onLogin }) => {
         
         const redirectUrl = `${window.location.origin}/`;
         
-        const { data, error } = await authClient.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password: password.trim(),
           options: {
