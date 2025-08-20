@@ -15,21 +15,22 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     )
 
     const { action, email, password, fullName } = await req.json()
     console.log(`Auth action: ${action} for email: ${email}`)
 
     if (action === 'signup') {
-      // Create new user
-      const { data: authData, error: authError } = await supabaseClient.auth.admin.createUser({
+      // Sign up new user
+      const { data: authData, error: authError } = await supabaseClient.auth.signUp({
         email: email,
         password: password,
-        user_metadata: {
-          full_name: fullName
-        },
-        email_confirm: true // Auto-confirm for development
+        options: {
+          data: {
+            full_name: fullName
+          }
+        }
       })
 
       if (authError) {
@@ -48,38 +49,14 @@ serve(async (req) => {
         )
       }
 
-      if (!authData.user) {
-        return new Response(
-          JSON.stringify({ error: true, message: 'User creation failed' }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400
-          }
-        )
-      }
-
-      // Create profile
-      const { error: profileError } = await supabaseClient
-        .from('profiles')
-        .insert({
-          user_id: authData.user.id,
-          full_name: fullName,
-          avatar_url: null
-        })
-
-      if (profileError) {
-        console.error('Profile creation error:', profileError)
-        // Don't fail signup if profile creation fails, user can still login
-      }
-
       console.log('Signup successful for:', email)
       return new Response(
         JSON.stringify({ 
           success: true, 
           message: 'Account ban gaya! Ab login kar sakte hain.',
           user: {
-            id: authData.user.id,
-            email: authData.user.email,
+            id: authData.user?.id,
+            email: authData.user?.email,
             name: fullName
           }
         }),
@@ -115,27 +92,10 @@ serve(async (req) => {
         )
       }
 
-      if (!authData.user) {
-        return new Response(
-          JSON.stringify({ error: true, message: 'Login failed - no user' }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400
-          }
-        )
-      }
-
-      // Get user profile
-      const { data: profile } = await supabaseClient
-        .from('profiles')
-        .select('*')
-        .eq('user_id', authData.user.id)
-        .single()
-
       const userData = {
-        id: authData.user.id,
-        email: authData.user.email,
-        name: profile?.full_name || authData.user.user_metadata?.full_name || authData.user.email?.split('@')[0] || 'User'
+        id: authData.user?.id,
+        email: authData.user?.email,
+        name: authData.user?.user_metadata?.full_name || authData.user?.email?.split('@')[0] || 'User'
       }
 
       console.log('Login successful for:', email)
