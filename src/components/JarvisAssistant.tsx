@@ -133,57 +133,17 @@ export const JarvisAssistant = () => {
       // Process commands when active
       if (isActive && transcript) {
         console.log('✅ Processing command since JARVIS is active');
-        // Security validation
-        const sanitizedTranscript = SecurityService.sanitizeInput(transcript, 500);
-        console.log('🔒 Sanitized transcript:', sanitizedTranscript);
-        if (!sanitizedTranscript) {
-          console.log('❌ Invalid transcript');
-          SecurityService.logSecurityEvent('INVALID_TRANSCRIPT', transcript);
-          return;
-        }
-
-        // Validate command
-        console.log('🔍 Validating command...');
-        const isValidCommand = SecurityService.validateCommand(sanitizedTranscript);
-        console.log('✔️ Command validation result:', isValidCommand);
-        if (!isValidCommand) {
-          console.log('❌ Command not valid');
-          SecurityService.logSecurityEvent('INVALID_COMMAND', sanitizedTranscript);
-          const warningMessage: ChatMessage = {
-            id: Date.now().toString(),
-            text: 'Sorry, that command is not recognized. Please try again.',
-            isUser: false,
-            timestamp: new Date()
-          };
-          setMessages(prev => [...prev, warningMessage]);
-          speak('Sorry, that command is not recognized.');
-          return;
-        }
-
-        // Check rate limiting
-        if (!SecurityService.checkRateLimit(sanitizedTranscript)) {
-          SecurityService.logSecurityEvent('RATE_LIMIT_EXCEEDED', sanitizedTranscript);
-          const rateLimitMessage: ChatMessage = {
-            id: Date.now().toString(),
-            text: 'Please wait a moment before sending another command.',
-            isUser: false,
-            timestamp: new Date()
-          };
-          setMessages(prev => [...prev, rateLimitMessage]);
-          speak('Please wait a moment.');
-          return;
-        }
-
+        
         const userMessage: ChatMessage = {
           id: Date.now().toString(),
-          text: sanitizedTranscript,
+          text: transcript,
           isUser: true,
           timestamp: new Date()
         };
         setMessages(prev => [...prev, userMessage]);
 
         // Process the command
-        processCommand(sanitizedTranscript);
+        processCommand(transcript);
       }
     }
   }, [isActive]); // Removed speak and processCommand from dependencies to prevent re-renders

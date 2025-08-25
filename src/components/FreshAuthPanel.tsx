@@ -68,41 +68,67 @@ export const FreshAuthPanel: React.FC<FreshAuthPanelProps> = ({ onLogin }) => {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('auth', {
-        body: {
-          action: isSignUp ? 'signup' : 'login',
+      if (isSignUp) {
+        // Sign up new user
+        const { data: authData, error: authError } = await supabase.auth.signUp({
           email: email.trim(),
           password: password.trim(),
-          fullName: fullName.trim()
+          options: {
+            data: {
+              full_name: fullName.trim()
+            },
+            emailRedirectTo: `${window.location.origin}/`
+          }
+        });
+
+        if (authError) {
+          throw new Error(authError.message === 'User already registered' 
+            ? 'Email already exist karta hai. Login karo.' 
+            : authError.message);
         }
-      });
 
-      if (error) {
-        throw new Error(error.message || 'Function call failed');
-      }
+        toast({
+          title: 'Success!',
+          description: 'Account ban gaya! Email confirm karo aur login karo.'
+        });
 
-      if (data.error) {
-        throw new Error(data.message);
-      }
-
-      toast({
-        title: 'Success!',
-        description: data.message
-      });
-
-      if (isSignUp) {
         // Switch to login mode after successful signup
         setIsSignUp(false);
         setPassword('');
         setFullName('');
       } else {
-        // Login successful, call onLogin
-        if (data.user) {
-          onLogin({
-            name: data.user.name,
-            email: data.user.email
-          });
+        // Sign in user
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password.trim()
+        });
+
+        if (authError) {
+          let message = 'Login failed';
+          
+          if (authError.message.includes('Invalid login credentials')) {
+            message = 'Email ya password galat hai';
+          } else if (authError.message.includes('Email not confirmed')) {
+            message = 'Email confirm nahi hai';
+          } else {
+            message = authError.message;
+          }
+
+          throw new Error(message);
         }
+
+        const userData = {
+          name: authData.user?.user_metadata?.full_name || authData.user?.email?.split('@')[0] || 'User',
+          email: authData.user?.email || ''
+        };
+
+        toast({
+          title: 'Success!',
+          description: `Welcome ${userData.name}! JARVIS ready hai.`
+        });
+
+        // Login successful, call onLogin
+        onLogin(userData);
       }
 
     } catch (error: any) {
