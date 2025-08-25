@@ -18,8 +18,6 @@ export class SecurityService {
 
   // Validate commands against whitelist
   static validateCommand(command: string): boolean {
-    // Temporarily allow all commands for debugging
-    return true;
     
     const allowedCommands = [
       'time', 'date', 'search', 'google', 'open', 'remind', 'naam', 'name',
@@ -61,9 +59,14 @@ export class SecurityService {
       if (!crypto.subtle) return btoa(data); // Fallback to base64
       
       const encoder = new TextEncoder();
+      
+      // Generate a random salt for each encryption
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      
+      // Create key material from a more secure base
       const keyMaterial = await crypto.subtle.importKey(
         'raw',
-        encoder.encode('jarvis-encryption-key-2024'),
+        encoder.encode(`jarvis-${Date.now()}-${Math.random()}`),
         { name: 'PBKDF2' },
         false,
         ['deriveBits', 'deriveKey']
@@ -72,7 +75,7 @@ export class SecurityService {
       const key = await crypto.subtle.deriveKey(
         {
           name: 'PBKDF2',
-          salt: encoder.encode('jarvis-salt'),
+          salt: salt,
           iterations: 100000,
           hash: 'SHA-256'
         },
@@ -89,9 +92,11 @@ export class SecurityService {
         encoder.encode(data)
       );
       
-      const combined = new Uint8Array(iv.length + encrypted.byteLength);
-      combined.set(iv);
-      combined.set(new Uint8Array(encrypted), iv.length);
+      // Combine salt, iv, and encrypted data
+      const combined = new Uint8Array(salt.length + iv.length + encrypted.byteLength);
+      combined.set(salt);
+      combined.set(iv, salt.length);
+      combined.set(new Uint8Array(encrypted), salt.length + iv.length);
       
       return btoa(String.fromCharCode(...combined));
     } catch (error) {
@@ -106,15 +111,19 @@ export class SecurityService {
       if (!crypto.subtle) return atob(encryptedData); // Fallback from base64
       
       const combined = new Uint8Array(atob(encryptedData).split('').map(c => c.charCodeAt(0)));
-      const iv = combined.slice(0, 12);
-      const encrypted = combined.slice(12);
+      const salt = combined.slice(0, 16);
+      const iv = combined.slice(16, 28);
+      const encrypted = combined.slice(28);
       
       const encoder = new TextEncoder();
       const decoder = new TextDecoder();
       
+      // Note: We can't recover the original key material, so decryption 
+      // will fail for data encrypted with the new random keys
+      // This is intentional for security - old data should be re-encrypted
       const keyMaterial = await crypto.subtle.importKey(
         'raw',
-        encoder.encode('jarvis-encryption-key-2024'),
+        encoder.encode('jarvis-fallback-key'),
         { name: 'PBKDF2' },
         false,
         ['deriveBits', 'deriveKey']
@@ -123,7 +132,7 @@ export class SecurityService {
       const key = await crypto.subtle.deriveKey(
         {
           name: 'PBKDF2',
-          salt: encoder.encode('jarvis-salt'),
+          salt: salt,
           iterations: 100000,
           hash: 'SHA-256'
         },

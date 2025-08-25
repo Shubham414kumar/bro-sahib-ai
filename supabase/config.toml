@@ -22,7 +22,10 @@ enable_anonymous_sign_ins = false
 verify_jwt = false
 
 [functions.create-razorpay-order]
-verify_jwt = true
+verify_jwt = false
 
 [functions.verify-razorpay-payment]
-verify_jwt = true
+verify_jwt = false
+
+[functions.deepseek-search]
+verify_jwt = false

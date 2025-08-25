@@ -1,15 +1,11 @@
 
 import { SecurityService } from './SecurityService';
+import { supabase } from '@/integrations/supabase/client';
 
 export class SearchService {
   private static readonly MAX_QUERY_LENGTH = 200;
   private static searchHistory: { query: string; timestamp: number }[] = [];
   private static readonly MAX_SEARCHES_PER_MINUTE = 10;
-  private static apiKey: string | null = null;
-
-  static setApiKey(key: string) {
-    this.apiKey = key;
-  }
 
   static async searchWeb(query: string): Promise<string> {
     try {
@@ -25,12 +21,17 @@ export class SearchService {
         return 'Too many searches. Please wait a moment before searching again.';
       }
 
-      // Use DeepSeek API if available
-      if (this.apiKey) {
-        return await this.searchWithDeepSeek(sanitizedQuery);
-      } else {
-        return 'API key nahi mila. Please API key enter karo search functionality ke liye.';
+      // Use the edge function for DeepSeek search
+      const { data, error } = await supabase.functions.invoke('deepseek-search', {
+        body: { query: sanitizedQuery }
+      });
+      
+      if (error) {
+        console.error('Search error:', error);
+        return 'Search service mein problem hai. Please try again later.';
       }
+      
+      return data.result || 'No response from search service.';
     } catch (error) {
       SecurityService.logSecurityEvent('SEARCH_ERROR', `${error.message} - Query: ${query}`);
       
@@ -42,60 +43,6 @@ export class SearchService {
     }
   }
 
-  private static async searchWithDeepSeek(query: string): Promise<string> {
-    console.log('DeepSeek API call starting with query:', query);
-    console.log('API Key available:', !!this.apiKey);
-    try {
-      const response = await fetch('https://api.deepseek.com/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [
-            {
-              role: 'system',
-              content: 'Be precise and concise. Answer in simple language. You are a helpful assistant that answers questions accurately.'
-            },
-            {
-              role: 'user',
-              content: query
-            }
-          ],
-          temperature: 0.3,
-          max_tokens: 500,
-          stream: false
-        }),
-      });
-
-      console.log('DeepSeek API response status:', response.status);
-      console.log('DeepSeek API response ok:', response.ok);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('DeepSeek API error response:', errorText);
-        throw new Error(`API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      console.log('DeepSeek API response data:', data);
-      
-      if (data.choices && data.choices[0] && data.choices[0].message) {
-        const responseText = SecurityService.sanitizeInput(data.choices[0].message.content, 1000);
-        console.log('DeepSeek response:', responseText);
-        return responseText;
-      } else {
-        console.error('Invalid API response format:', data);
-        throw new Error('Invalid API response format');
-      }
-    } catch (error) {
-      console.error('DeepSeek API error details:', error);
-      SecurityService.logSecurityEvent('DEEPSEEK_API_ERROR', `${error.message}`);
-      return `Search API mein problem hai: ${error.message}. Please check API key aur internet connection.`;
-    }
-  }
 
   private static checkSearchRateLimit(): boolean {
     const now = Date.now();

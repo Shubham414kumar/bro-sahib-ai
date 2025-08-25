@@ -298,11 +298,10 @@ export const JarvisAssistant = () => {
     }
   };
 
-  // Set API key on mount
+  // Initialize services
   useEffect(() => {
-    const defaultApiKey = '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';
-    setApiKey(defaultApiKey);
-    SearchService.setApiKey(defaultApiKey);
+    // API key is now handled by edge function
+    console.log('DeepSeek API is now configured through edge function');
   }, []);
 
   // Auto-start listening when component mounts
