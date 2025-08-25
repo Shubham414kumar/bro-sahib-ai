@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { VoiceVisualizer } from './VoiceVisualizer';
 import { ChatHistory } from './ChatHistory';
 import { ControlPanel } from './ControlPanel';
-import { FreshAuthPanel } from './FreshAuthPanel';
 import { PaymentPlans } from './PaymentPlans';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
@@ -26,8 +24,6 @@ interface ChatMessage {
 const WAKE_PHRASES = ['hey bro', 'hai bro', 'हे ब्रो', 'हाय ब्रो'];
 
 export const JarvisAssistant = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
   const [isActive, setIsActive] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activeFeatures, setActiveFeatures] = useState<string[]>(['email', 'youtube']);
@@ -38,69 +34,9 @@ export const JarvisAssistant = () => {
 
   const { speak, isSpeaking, stop: stopSpeaking } = useTextToSpeech();
 
-  // Check authentication state and load user data
+  // Initialize services on mount
   useEffect(() => {
-    const checkAuthState = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        // Fetch profile from database
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
-
-        const userData = {
-          ...session.user,
-          name: profile?.full_name || session.user.email?.split('@')[0] || 'User',
-          email: session.user.email || ''
-        };
-
-        setCurrentUser(userData);
-        setIsLoggedIn(true);
-        localStorage.setItem('jarvis_user', JSON.stringify(userData));
-      } else {
-        // Check localStorage as fallback
-        const storedUser = localStorage.getItem('jarvis_user');
-        if (storedUser) {
-          const userData = JSON.parse(storedUser);
-          setCurrentUser(userData);
-          setIsLoggedIn(true);
-        }
-      }
-    };
-
-    checkAuthState();
     ReminderService.requestNotificationPermission();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        setTimeout(async () => {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
-
-          const userData = {
-            name: profile?.full_name || session.user.email?.split('@')[0] || 'User',
-            email: session.user.email || ''
-          };
-
-          setCurrentUser(userData);
-          setIsLoggedIn(true);
-          localStorage.setItem('jarvis_user', JSON.stringify(userData));
-        }, 0);
-      } else if (event === 'SIGNED_OUT') {
-        setCurrentUser(null);
-        setIsLoggedIn(false);
-        localStorage.removeItem('jarvis_user');
-      }
-    });
-
-    return () => subscription.unsubscribe();
   }, []);
 
   const handleSpeechResult = useCallback((result: any) => {
@@ -378,58 +314,17 @@ export const JarvisAssistant = () => {
     return () => clearTimeout(timer);
   }, []); // Empty dependency array to run only once on mount
 
-  const handleLogin = (userData: { name: string; email: string }) => {
-    setCurrentUser(userData);
-    setIsLoggedIn(true);
-    toast({
-      title: 'Welcome to JARVIS!',
-      description: `Hello ${userData.name}, system ready hai`
-    });
-  };
-
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      setCurrentUser(null);
-      setIsLoggedIn(false);
-      localStorage.removeItem('jarvis_user');
-      toast({
-        title: 'Logged out successfully',
-        description: 'See you soon!'
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-      // Force logout even if Supabase fails
-      setCurrentUser(null);
-      setIsLoggedIn(false);
-      localStorage.removeItem('jarvis_user');
-    }
-  };
-
-  // Show login panel if not logged in
-  if (!isLoggedIn) {
-    return <FreshAuthPanel onLogin={handleLogin} />;
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-jarvis-dark via-jarvis-dark-light to-jarvis-dark p-4">
       <div className="container mx-auto max-w-7xl">
         {/* Header */}
         <div className="text-center mb-8 jarvis-fade-in">
-          <div className="flex justify-between items-center mb-4">
-            <div></div>
-            <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-jarvis-blue to-jarvis-blue-light bg-clip-text text-transparent">
-              JARVIS
-            </h1>
-            <button
-              onClick={handleLogout}
-              className="text-jarvis-blue hover:text-jarvis-blue-light text-sm transition-colors"
-            >
-              Logout
-            </button>
-          </div>
+          <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-jarvis-blue to-jarvis-blue-light bg-clip-text text-transparent mb-4">
+            JARVIS
+          </h1>
           <p className="text-muted-foreground text-lg">
-            Welcome {currentUser?.name} - {isActive ? 'Active' : 'Standby Mode'}
+            {isActive ? 'Active - Sun raha hun' : 'Standby Mode - Say "Hey Bro" to activate'}
           </p>
           <p className="text-xs text-jarvis-blue-light mt-2">
             Features: Voice I/O • System Commands • Web Search • Memory • Reminders • Hinglish Support
@@ -491,7 +386,7 @@ export const JarvisAssistant = () => {
           </TabsContent>
           
           <TabsContent value="premium" className="flex justify-center">
-            <PaymentPlans user={currentUser} />
+            <PaymentPlans user={{ name: 'User', email: 'user@example.com' }} />
           </TabsContent>
         </Tabs>
       </div>
