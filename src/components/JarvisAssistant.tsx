@@ -4,6 +4,8 @@ import { VoiceVisualizer } from './VoiceVisualizer';
 import { ChatHistory } from './ChatHistory';
 import { ControlPanel } from './ControlPanel';
 import { FreshAuthPanel } from './FreshAuthPanel';
+import { PaymentPlans } from './PaymentPlans';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import { useToast } from '@/hooks/use-toast';
@@ -25,12 +27,13 @@ const WAKE_PHRASES = ['hey bro', 'hai bro', 'हे ब्रो', 'हाय �
 
 export const JarvisAssistant = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{ name: string; email: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [isActive, setIsActive] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activeFeatures, setActiveFeatures] = useState<string[]>(['email', 'youtube']);
   const [isMuted, setIsMuted] = useState(false);
   const [apiKey, setApiKey] = useState<string>('');
+  const [activeTab, setActiveTab] = useState('assistant');
   const { toast } = useToast();
 
   const { speak, isSpeaking, stop: stopSpeaking } = useTextToSpeech();
@@ -49,6 +52,7 @@ export const JarvisAssistant = () => {
           .maybeSingle();
 
         const userData = {
+          ...session.user,
           name: profile?.full_name || session.user.email?.split('@')[0] || 'User',
           email: session.user.email || ''
         };
@@ -472,53 +476,64 @@ export const JarvisAssistant = () => {
           </p>
         </div>
 
-        {/* Main Interface */}
-        <div className="flex flex-col items-center space-y-8">
-          {/* Voice Visualizer */}
-          <div className="jarvis-fade-in">
-            <VoiceVisualizer 
-              isListening={isListening} 
-              isSpeaking={isSpeaking} 
-              isActive={isActive} 
-            />
-          </div>
+        {/* Tabs for Assistant and Premium Plans */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
+            <TabsTrigger value="assistant">Assistant</TabsTrigger>
+            <TabsTrigger value="premium">Premium Plans</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="assistant" className="flex flex-col items-center space-y-8">
+            {/* Voice Visualizer */}
+            <div className="jarvis-fade-in">
+              <VoiceVisualizer 
+                isListening={isListening} 
+                isSpeaking={isSpeaking} 
+                isActive={isActive} 
+              />
+            </div>
 
-          {/* Status Message */}
-          <div className="text-center jarvis-fade-in">
-            {!isActive ? (
-              <div>
-                <p className="text-jarvis-blue text-xl mb-2">
-                  Say "Hey Bro" to activate JARVIS
+            {/* Status Message */}
+            <div className="text-center jarvis-fade-in">
+              {!isActive ? (
+                <div>
+                  <p className="text-jarvis-blue text-xl mb-2">
+                    Say "Hey Bro" to activate JARVIS
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Try: "search something" • "open notepad" • "remind me in 5 minutes" • "mera naam yaad rakho"
+                  </p>
+                </div>
+              ) : (
+                <p className="text-jarvis-blue-light text-lg">
+                  {isListening ? 'Listening... (Hinglish supported)' : 'Click the mic to speak'}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Try: "search something" • "open notepad" • "remind me in 5 minutes" • "mera naam yaad rakho"
-                </p>
-              </div>
-            ) : (
-              <p className="text-jarvis-blue-light text-lg">
-                {isListening ? 'Listening... (Hinglish supported)' : 'Click the mic to speak'}
-              </p>
-            )}
-          </div>
+              )}
+            </div>
 
-          {/* Control Panel */}
-          <div className="jarvis-fade-in">
-            <ControlPanel
-              isListening={isListening}
-              isMuted={isMuted}
-              isOnline={true}
-              activeFeatures={activeFeatures}
-              onToggleListening={handleToggleListening}
-              onToggleMute={handleToggleMute}
-              onFeatureClick={handleFeatureClick}
-            />
-          </div>
+            {/* Control Panel */}
+            <div className="jarvis-fade-in">
+              <ControlPanel
+                isListening={isListening}
+                isMuted={isMuted}
+                isOnline={true}
+                activeFeatures={activeFeatures}
+                onToggleListening={handleToggleListening}
+                onToggleMute={handleToggleMute}
+                onFeatureClick={handleFeatureClick}
+              />
+            </div>
 
-          {/* Chat History */}
-          <div className="jarvis-fade-in">
-            <ChatHistory messages={messages} />
-          </div>
-        </div>
+            {/* Chat History */}
+            <div className="jarvis-fade-in">
+              <ChatHistory messages={messages} />
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="premium" className="flex justify-center">
+            <PaymentPlans user={currentUser} />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
