@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_passes: {
+        Row: {
+          created_at: string | null
+          id: number
+          is_used: boolean | null
+          pass_code: string
+          plan_id: string
+          redeemed_by_user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: number
+          is_used?: boolean | null
+          pass_code: string
+          plan_id: string
+          redeemed_by_user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: number
+          is_used?: boolean | null
+          pass_code?: string
+          plan_id?: string
+          redeemed_by_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_passes_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           amount: number
@@ -124,12 +159,39 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription: {
+        Row: {
+          created_at: string
+          id: number
+          plan: string | null
+          status: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          plan?: string | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          plan?: string | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      redeem_pass_and_subscribe: {
+        Args: { pass_code_to_redeem: string; user_id_to_update: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
