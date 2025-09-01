@@ -385,7 +385,7 @@ export const JarvisAssistant = () => {
           </TabsContent>
           
           <TabsContent value="premium" className="flex justify-center">
-            <PaymentPlans user={{ name: 'User', email: 'user@example.com' }} />
+            <PaymentPlans />
           </TabsContent>
         </Tabs>
       </div>

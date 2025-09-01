@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Check, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 declare global {
   interface Window {
@@ -21,11 +22,8 @@ interface Plan {
   features: string[];
 }
 
-interface PaymentPlansProps {
-  user: any;
-}
-
-export const PaymentPlans = ({ user }: PaymentPlansProps) => {
+export const PaymentPlans = () => {
+  const { user } = useAuth();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);

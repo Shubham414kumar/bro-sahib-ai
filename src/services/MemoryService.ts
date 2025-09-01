@@ -1,4 +1,5 @@
 import { SecurityService } from './SecurityService';
+import { SecureEncryption } from './SecureEncryption';
 
 interface MemoryItem {
   key: string;
@@ -30,7 +31,7 @@ export class MemoryService {
         memories.shift(); // Remove oldest memory
       }
       
-      const encryptedValue = await SecurityService.encryptData(sanitizedValue);
+      const encryptedValue = await SecureEncryption.encrypt(sanitizedValue);
       const newMemory: MemoryItem = {
         key: sanitizedKey.toLowerCase(),
         value: encryptedValue,
@@ -57,7 +58,7 @@ export class MemoryService {
       if (!memory) return null;
       
       if (memory.encrypted) {
-        return await SecurityService.decryptData(memory.value);
+        return await SecureEncryption.decrypt(memory.value);
       }
       
       return memory.value;
