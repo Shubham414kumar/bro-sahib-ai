@@ -1,5 +1,4 @@
 import { JarvisAssistant } from '@/components/JarvisAssistant';
-import { PaymentPlans } from '@/components/PaymentPlans';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 
@@ -17,9 +16,6 @@ const Index = () => {
         </div>
       </div>
       <JarvisAssistant />
-      <div className="mt-8">
-        <PaymentPlans />
-      </div>
     </div>
   );
 };

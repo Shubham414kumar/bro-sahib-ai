@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, Loader2, Crown, Zap, Star } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { cn } from '@/lib/utils';
 
 declare global {
   interface Window {
@@ -20,6 +21,7 @@ interface Plan {
   currency: string;
   type: string;
   features: string[];
+  tier: string;
 }
 
 export const PaymentPlans = () => {
@@ -149,14 +151,38 @@ export const PaymentPlans = () => {
     );
   }
 
+  const getIconForTier = (tier: string) => {
+    switch (tier) {
+      case 'basic':
+        return <Star className="h-6 w-6" />;
+      case 'standard':
+        return <Zap className="h-6 w-6" />;
+      case 'premium':
+        return <Crown className="h-6 w-6" />;
+      default:
+        return null;
+    }
+  };
+
+  const getTierColor = (tier: string) => {
+    switch (tier) {
+      case 'basic':
+        return 'from-blue-500 to-cyan-500';
+      case 'standard':
+        return 'from-purple-500 to-pink-500';
+      case 'premium':
+        return 'from-yellow-500 to-orange-500';
+      default:
+        return 'from-gray-500 to-gray-600';
+    }
+  };
+
   return (
-    <div className="w-full max-w-6xl mx-auto p-6">
-      <div className="text-center mb-12">
-        <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-primary to-primary-foreground bg-clip-text text-transparent">
-          Choose Your Plan
-        </h2>
-        <p className="text-muted-foreground text-lg">
-          Unlock premium features for your Jarvis Assistant
+    <div className="w-full">
+      <div className="text-center mb-8">
+        <h3 className="text-2xl font-bold mb-2">Choose Your Plan</h3>
+        <p className="text-muted-foreground">
+          Unlock powerful features for your Jarvis Assistant
         </p>
       </div>
 
@@ -164,27 +190,44 @@ export const PaymentPlans = () => {
         {plans.map((plan) => (
           <Card 
             key={plan.id} 
-            className="relative overflow-hidden border-2 hover:border-primary transition-all duration-300 hover:shadow-xl"
+            className={cn(
+              "relative overflow-hidden transition-all duration-300 hover:shadow-xl",
+              plan.tier === 'premium' && "border-2 border-primary"
+            )}
           >
+            {plan.tier === 'premium' && (
+              <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1 text-xs font-bold rounded-bl-lg">
+                BEST VALUE
+              </div>
+            )}
             <CardHeader>
-              <CardTitle className="text-2xl">{plan.name}</CardTitle>
-              <CardDescription className="text-base">{plan.description}</CardDescription>
+              <div className={cn(
+                "w-12 h-12 rounded-lg bg-gradient-to-br flex items-center justify-center text-white mb-4",
+                getTierColor(plan.tier)
+              )}>
+                {getIconForTier(plan.tier)}
+              </div>
+              <CardTitle className="text-xl">{plan.name}</CardTitle>
+              <CardDescription className="text-sm">{plan.description}</CardDescription>
               <div className="mt-4">
-                <span className="text-4xl font-bold">₹{(plan.price / 100).toFixed(0)}</span>
-                <span className="text-muted-foreground ml-2">one-time</span>
+                <span className="text-3xl font-bold">₹{(plan.price / 100).toFixed(0)}</span>
+                <span className="text-muted-foreground ml-2 text-sm">one-time</span>
               </div>
             </CardHeader>
             <CardContent>
-              <ul className="space-y-3 mb-6">
+              <ul className="space-y-2 mb-6">
                 {plan.features.map((feature, index) => (
                   <li key={index} className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                    <span className="text-sm">{feature}</span>
+                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span className="text-xs">{feature}</span>
                   </li>
                 ))}
               </ul>
               <Button
-                className="w-full"
+                className={cn(
+                  "w-full",
+                  plan.tier === 'premium' && "bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
+                )}
                 size="lg"
                 onClick={() => handlePayment(plan)}
                 disabled={processingPlanId === plan.id}

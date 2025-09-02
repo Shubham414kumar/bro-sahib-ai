@@ -14,121 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
-      access_passes: {
-        Row: {
-          created_at: string | null
-          id: number
-          is_used: boolean | null
-          pass_code: string
-          plan_id: string
-          redeemed_by_user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: number
-          is_used?: boolean | null
-          pass_code: string
-          plan_id: string
-          redeemed_by_user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: number
-          is_used?: boolean | null
-          pass_code?: string
-          plan_id?: string
-          redeemed_by_user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "access_passes_plan_id_fkey"
-            columns: ["plan_id"]
-            isOneToOne: false
-            referencedRelation: "plans"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      orders: {
-        Row: {
-          amount: number
-          created_at: string
-          currency: string | null
-          id: string
-          plan_id: string | null
-          razorpay_order_id: string | null
-          razorpay_payment_id: string | null
-          razorpay_signature: string | null
-          status: string | null
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          currency?: string | null
-          id?: string
-          plan_id?: string | null
-          razorpay_order_id?: string | null
-          razorpay_payment_id?: string | null
-          razorpay_signature?: string | null
-          status?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          currency?: string | null
-          id?: string
-          plan_id?: string | null
-          razorpay_order_id?: string | null
-          razorpay_payment_id?: string | null
-          razorpay_signature?: string | null
-          status?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "orders_plan_id_fkey"
-            columns: ["plan_id"]
-            isOneToOne: false
-            referencedRelation: "plans"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       plans: {
         Row: {
-          created_at: string
+          created_at: string | null
           currency: string | null
           description: string | null
-          features: Json | null
+          features: string[] | null
           id: string
           name: string
           price: number
+          tier: string
           type: string
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           currency?: string | null
           description?: string | null
-          features?: Json | null
+          features?: string[] | null
           id?: string
           name: string
           price: number
+          tier: string
           type: string
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           currency?: string | null
           description?: string | null
-          features?: Json | null
+          features?: string[] | null
           id?: string
           name?: string
           price?: number
+          tier?: string
           type?: string
+        }
+        Relationships: []
+      }
+      premium_passes: {
+        Row: {
+          code: string
+          created_at: string | null
+          id: string
+          is_redeemed: boolean | null
+          redeemed_at: string | null
+          redeemed_by: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          id?: string
+          is_redeemed?: boolean | null
+          redeemed_at?: string | null
+          redeemed_by?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          id?: string
+          is_redeemed?: boolean | null
+          redeemed_at?: string | null
+          redeemed_by?: string | null
         }
         Relationships: []
       }
@@ -159,29 +104,49 @@ export type Database = {
         }
         Relationships: []
       }
-      subscription: {
+      user_purchases: {
         Row: {
-          created_at: string
-          id: number
-          plan: string | null
-          status: string | null
+          created_at: string | null
+          expiry_date: string | null
+          id: string
+          is_active: boolean | null
+          payment_id: string | null
+          plan_id: string | null
+          purchase_date: string | null
+          tier: string
           user_id: string | null
         }
         Insert: {
-          created_at?: string
-          id?: number
-          plan?: string | null
-          status?: string | null
+          created_at?: string | null
+          expiry_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          payment_id?: string | null
+          plan_id?: string | null
+          purchase_date?: string | null
+          tier: string
           user_id?: string | null
         }
         Update: {
-          created_at?: string
-          id?: number
-          plan?: string | null
-          status?: string | null
+          created_at?: string | null
+          expiry_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          payment_id?: string | null
+          plan_id?: string | null
+          purchase_date?: string | null
+          tier?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_purchases_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

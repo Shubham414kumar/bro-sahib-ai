@@ -5,6 +5,7 @@ import { ControlPanel } from './ControlPanel';
 import { PaymentPlans } from './PaymentPlans';
 import { LiveTranscript } from './LiveTranscript';
 import { SystemCommandPanel } from './SystemCommandPanel';
+import { PremiumGate } from './PremiumGate';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Card } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
@@ -16,8 +17,9 @@ import { SearchService } from '@/services/SearchService';
 import { AdvancedSystemService } from '@/services/AdvancedSystemService';
 import { ReminderService } from '@/services/ReminderService';
 import { SecurityService } from '@/services/SecurityService';
+import PlanService, { UserTier } from '@/services/PlanService';
 import { Button } from './ui/button';
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Crown } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -38,6 +40,8 @@ export const JarvisAssistant = () => {
   const [activeTab, setActiveTab] = useState('assistant');
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [showPremiumGate, setShowPremiumGate] = useState(false);
+  const [userTier, setUserTier] = useState<UserTier>('free');
   const { toast } = useToast();
 
   const { speak, isSpeaking, stop: stopSpeaking } = useTextToSpeech();
@@ -45,6 +49,8 @@ export const JarvisAssistant = () => {
   // Initialize services on mount
   useEffect(() => {
     ReminderService.requestNotificationPermission();
+    // Load user tier on component mount
+    PlanService.getUserTier().then(setUserTier);
   }, []);
 
   const handleSpeechResult = useCallback((result: any) => {
@@ -164,7 +170,7 @@ export const JarvisAssistant = () => {
         response = 'Kya search karna hai? Boliye "search [your query]"';
       }
     }
-    // Advanced System commands
+    // Advanced System commands with tier checking
     else if (lowerCommand.includes('open') || lowerCommand.includes('kholo') || 
              lowerCommand.includes('play') || lowerCommand.includes('youtube') ||
              lowerCommand.includes('calculate') || lowerCommand.includes('whatsapp') ||
@@ -174,7 +180,42 @@ export const JarvisAssistant = () => {
              lowerCommand.includes('news') || lowerCommand.includes('battery') ||
              lowerCommand.includes('network') || lowerCommand.includes('timer') ||
              lowerCommand.includes('translate') || lowerCommand.includes('screenshot')) {
-      response = AdvancedSystemService.executeCommand(command);
+      
+      // Check feature availability based on user tier
+      const commandFeatureMap: Record<string, string> = {
+        'youtube': userTier === 'basic' ? 'youtube_basic' : 'youtube_full',
+        'calculator': 'calculator',
+        'browser': 'browser',
+        'chrome': 'browser',
+        'gmail': 'gmail',
+        'email': 'gmail',
+        'whatsapp': userTier === 'premium' ? 'whatsapp_messaging' : 'whatsapp_open',
+        'maps': 'maps',
+        'map': 'maps',
+        'navigate': 'maps',
+        'screen': 'screen_automation',
+        'face': 'face_recognition',
+        'study': 'study_assistant',
+      };
+
+      // Find which feature this command needs
+      let requiredFeature = '';
+      for (const [keyword, feature] of Object.entries(commandFeatureMap)) {
+        if (lowerCommand.includes(keyword)) {
+          requiredFeature = feature;
+          break;
+        }
+      }
+
+      // Check if user has access to this feature
+      if (requiredFeature && !PlanService.isFeatureAvailable(requiredFeature)) {
+        response = userTier === 'free' 
+          ? "Ye feature premium hai bro. Crown icon pe click karke plan choose karo."
+          : "Is feature ke liye aapko upgrade karna padega. Crown icon pe click karo.";
+        setShowPremiumGate(true);
+      } else {
+        response = AdvancedSystemService.executeCommand(command);
+      }
     }
     // Reminders
     else if (lowerCommand.includes('remind me') || lowerCommand.includes('yaad dilana')) {
@@ -343,6 +384,9 @@ export const JarvisAssistant = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-jarvis-dark via-jarvis-dark-light to-jarvis-dark">
+      {/* Premium Gate Modal */}
+      <PremiumGate isOpen={showPremiumGate} onClose={() => setShowPremiumGate(false)} />
+      
       {/* Header */}
       <div className="h-16 bg-background/50 backdrop-blur-sm border-b border-jarvis-blue/20 flex items-center px-4">
         <Button
@@ -355,22 +399,44 @@ export const JarvisAssistant = () => {
         </Button>
         
         <div className="flex-1 text-center">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-jarvis-blue to-jarvis-blue-light bg-clip-text text-transparent">
-            JARVIS AI ASSISTANT
-          </h1>
+          <div className="flex items-center justify-center gap-2">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-jarvis-blue to-jarvis-blue-light bg-clip-text text-transparent">
+              JARVIS AI ASSISTANT
+            </h1>
+            {userTier !== 'free' && (
+              <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                userTier === 'basic' ? 'bg-blue-500' :
+                userTier === 'standard' ? 'bg-purple-500' :
+                'bg-gradient-to-r from-yellow-500 to-orange-500'
+              } text-white`}>
+                {userTier.toUpperCase()}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
             {isActive ? '🟢 Active - Sun raha hun' : '⚪ Standby - Say "Hey Bro" to activate'}
           </p>
         </div>
         
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setRightPanelOpen(!rightPanelOpen)}
-          className="text-jarvis-blue hover:bg-jarvis-blue/10"
-        >
-          {rightPanelOpen ? <PanelRightClose /> : <PanelRightOpen />}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowPremiumGate(true)}
+            className="text-yellow-500 hover:bg-yellow-500/10"
+            title="Premium Plans"
+          >
+            <Crown />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setRightPanelOpen(!rightPanelOpen)}
+            className="text-jarvis-blue hover:bg-jarvis-blue/10"
+          >
+            {rightPanelOpen ? <PanelRightClose /> : <PanelRightOpen />}
+          </Button>
+        </div>
       </div>
 
       {/* Main Content Area */}
@@ -392,7 +458,6 @@ export const JarvisAssistant = () => {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
             <TabsList className="mx-auto mt-4 bg-background/50 border border-jarvis-blue/20">
               <TabsTrigger value="assistant">Assistant</TabsTrigger>
-              <TabsTrigger value="premium">Premium Plans</TabsTrigger>
             </TabsList>
             
             <TabsContent value="assistant" className="flex-1 flex flex-col items-center justify-center space-y-6 p-4">
@@ -459,10 +524,6 @@ export const JarvisAssistant = () => {
                   </ScrollArea>
                 </Card>
               </div>
-            </TabsContent>
-            
-            <TabsContent value="premium" className="flex-1 flex items-center justify-center">
-              <PaymentPlans />
             </TabsContent>
           </Tabs>
         </div>
