@@ -3,15 +3,21 @@ import { VoiceVisualizer } from './VoiceVisualizer';
 import { ChatHistory } from './ChatHistory';
 import { ControlPanel } from './ControlPanel';
 import { PaymentPlans } from './PaymentPlans';
+import { LiveTranscript } from './LiveTranscript';
+import { SystemCommandPanel } from './SystemCommandPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Card } from './ui/card';
+import { ScrollArea } from './ui/scroll-area';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import { useToast } from '@/hooks/use-toast';
 import { MemoryService } from '@/services/MemoryService';
 import { SearchService } from '@/services/SearchService';
-import { SystemService } from '@/services/SystemService';
+import { AdvancedSystemService } from '@/services/AdvancedSystemService';
 import { ReminderService } from '@/services/ReminderService';
 import { SecurityService } from '@/services/SecurityService';
+import { Button } from './ui/button';
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -30,6 +36,8 @@ export const JarvisAssistant = () => {
   const [isMuted, setIsMuted] = useState(false);
   const [apiKey, setApiKey] = useState<string>('');
   const [activeTab, setActiveTab] = useState('assistant');
+  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const { toast } = useToast();
 
   const { speak, isSpeaking, stop: stopSpeaking } = useTextToSpeech();
@@ -156,9 +164,17 @@ export const JarvisAssistant = () => {
         response = 'Kya search karna hai? Boliye "search [your query]"';
       }
     }
-    // System commands
-    else if (lowerCommand.includes('open') || lowerCommand.includes('kholo')) {
-      response = SystemService.executeCommand(command);
+    // Advanced System commands
+    else if (lowerCommand.includes('open') || lowerCommand.includes('kholo') || 
+             lowerCommand.includes('play') || lowerCommand.includes('youtube') ||
+             lowerCommand.includes('calculate') || lowerCommand.includes('whatsapp') ||
+             lowerCommand.includes('map') || lowerCommand.includes('navigate') ||
+             lowerCommand.includes('email') || lowerCommand.includes('gmail') ||
+             lowerCommand.includes('amazon') || lowerCommand.includes('weather') ||
+             lowerCommand.includes('news') || lowerCommand.includes('battery') ||
+             lowerCommand.includes('network') || lowerCommand.includes('timer') ||
+             lowerCommand.includes('translate') || lowerCommand.includes('screenshot')) {
+      response = AdvancedSystemService.executeCommand(command);
     }
     // Reminders
     else if (lowerCommand.includes('remind me') || lowerCommand.includes('yaad dilana')) {
@@ -298,6 +314,17 @@ export const JarvisAssistant = () => {
     }
   };
 
+  const handleSystemCommand = (command: string) => {
+    if (isActive) {
+      processCommand(command);
+    } else {
+      toast({
+        title: 'JARVIS is not active',
+        description: 'Say "Hey Bro" to activate JARVIS first'
+      });
+    }
+  };
+
   // Initialize services
   useEffect(() => {
     // API key is now handled by edge function
@@ -315,79 +342,137 @@ export const JarvisAssistant = () => {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-jarvis-dark via-jarvis-dark-light to-jarvis-dark p-4">
-      <div className="container mx-auto max-w-7xl">
-        {/* Header */}
-        <div className="text-center mb-8 jarvis-fade-in">
-          <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-jarvis-blue to-jarvis-blue-light bg-clip-text text-transparent mb-4">
-            JARVIS
+    <div className="min-h-screen bg-gradient-to-br from-jarvis-dark via-jarvis-dark-light to-jarvis-dark">
+      {/* Header */}
+      <div className="h-16 bg-background/50 backdrop-blur-sm border-b border-jarvis-blue/20 flex items-center px-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setLeftPanelOpen(!leftPanelOpen)}
+          className="text-jarvis-blue hover:bg-jarvis-blue/10"
+        >
+          {leftPanelOpen ? <PanelLeftClose /> : <PanelLeftOpen />}
+        </Button>
+        
+        <div className="flex-1 text-center">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-jarvis-blue to-jarvis-blue-light bg-clip-text text-transparent">
+            JARVIS AI ASSISTANT
           </h1>
-          <p className="text-muted-foreground text-lg">
-            {isActive ? 'Active - Sun raha hun' : 'Standby Mode - Say "Hey Bro" to activate'}
-          </p>
-          <p className="text-xs text-jarvis-blue-light mt-2">
-            Features: Voice I/O • System Commands • Web Search • Memory • Reminders • Hinglish Support
+          <p className="text-xs text-muted-foreground">
+            {isActive ? '🟢 Active - Sun raha hun' : '⚪ Standby - Say "Hey Bro" to activate'}
           </p>
         </div>
+        
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setRightPanelOpen(!rightPanelOpen)}
+          className="text-jarvis-blue hover:bg-jarvis-blue/10"
+        >
+          {rightPanelOpen ? <PanelRightClose /> : <PanelRightOpen />}
+        </Button>
+      </div>
 
-        {/* Tabs for Assistant and Premium Plans */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
-            <TabsTrigger value="assistant">Assistant</TabsTrigger>
-            <TabsTrigger value="premium">Premium Plans</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="assistant" className="flex flex-col items-center space-y-8">
-            {/* Voice Visualizer */}
-            <div className="jarvis-fade-in">
-              <VoiceVisualizer 
-                isListening={isListening} 
-                isSpeaking={isSpeaking} 
-                isActive={isActive} 
-              />
-            </div>
+      {/* Main Content Area */}
+      <div className="h-[calc(100vh-4rem)] flex">
+        {/* Left Panel - Live Transcript */}
+        <div className={`transition-all duration-300 ${leftPanelOpen ? 'w-80' : 'w-0'} overflow-hidden`}>
+          <div className="h-full p-4">
+            <LiveTranscript 
+              entries={messages}
+              isListening={isListening}
+              isSpeaking={isSpeaking}
+              isMuted={isMuted}
+            />
+          </div>
+        </div>
 
-            {/* Status Message */}
-            <div className="text-center jarvis-fade-in">
-              {!isActive ? (
-                <div>
-                  <p className="text-jarvis-blue text-xl mb-2">
-                    Say "Hey Bro" to activate JARVIS
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Try: "search something" • "open notepad" • "remind me in 5 minutes" • "mera naam yaad rakho"
-                  </p>
-                </div>
-              ) : (
-                <p className="text-jarvis-blue-light text-lg">
-                  {isListening ? 'Listening... (Hinglish supported)' : 'Click the mic to speak'}
-                </p>
-              )}
-            </div>
+        {/* Center - Main Interface */}
+        <div className="flex-1 flex flex-col">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+            <TabsList className="mx-auto mt-4 bg-background/50 border border-jarvis-blue/20">
+              <TabsTrigger value="assistant">Assistant</TabsTrigger>
+              <TabsTrigger value="premium">Premium Plans</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="assistant" className="flex-1 flex flex-col items-center justify-center space-y-6 p-4">
+              {/* Voice Visualizer */}
+              <div className="jarvis-fade-in">
+                <VoiceVisualizer 
+                  isListening={isListening} 
+                  isSpeaking={isSpeaking} 
+                  isActive={isActive} 
+                />
+              </div>
 
-            {/* Control Panel */}
-            <div className="jarvis-fade-in">
-              <ControlPanel
-                isListening={isListening}
-                isMuted={isMuted}
-                isOnline={true}
-                activeFeatures={activeFeatures}
-                onToggleListening={handleToggleListening}
-                onToggleMute={handleToggleMute}
-                onFeatureClick={handleFeatureClick}
-              />
-            </div>
+              {/* Status Message */}
+              <div className="text-center jarvis-fade-in max-w-2xl">
+                {!isActive ? (
+                  <div>
+                    <p className="text-jarvis-blue text-2xl mb-3 font-semibold">
+                      Say "Hey Bro" to activate JARVIS
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Available commands: YouTube • Calculator • WhatsApp • Maps • Email • Weather • Timer • Translation
+                    </p>
+                    <p className="text-xs text-jarvis-blue-light mt-2">
+                      Try: "play YouTube video" • "calculate 100 + 200" • "open WhatsApp" • "check weather"
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-jarvis-blue-light text-xl animate-pulse">
+                      {isListening ? '🎤 Listening... (Hinglish supported)' : '🔊 Click the mic to speak'}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Command Examples: "YouTube pe Arijit Singh" • "Calculate karo 50 * 3" • "Weather check karo Delhi"
+                    </p>
+                  </div>
+                )}
+              </div>
 
-            {/* Chat History */}
-            <div className="jarvis-fade-in">
-              <ChatHistory messages={messages} />
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="premium" className="flex justify-center">
-            <PaymentPlans />
-          </TabsContent>
-        </Tabs>
+              {/* Control Panel */}
+              <div className="jarvis-fade-in">
+                <ControlPanel
+                  isListening={isListening}
+                  isMuted={isMuted}
+                  isOnline={true}
+                  activeFeatures={activeFeatures}
+                  onToggleListening={handleToggleListening}
+                  onToggleMute={handleToggleMute}
+                  onFeatureClick={handleFeatureClick}
+                />
+              </div>
+
+              {/* Chat History - Compact View */}
+              <div className="jarvis-fade-in w-full max-w-3xl">
+                <Card className="bg-card/30 backdrop-blur-sm border-jarvis-blue/20 max-h-48 overflow-y-auto">
+                  <ScrollArea className="h-full p-4">
+                    <div className="space-y-2">
+                      {messages.slice(-3).map((msg) => (
+                        <div key={msg.id} className={`text-sm ${msg.isUser ? 'text-primary' : 'text-jarvis-blue'}`}>
+                          <span className="font-medium">{msg.isUser ? 'You: ' : 'JARVIS: '}</span>
+                          {msg.text}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </Card>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="premium" className="flex-1 flex items-center justify-center">
+              <PaymentPlans />
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Right Panel - System Commands */}
+        <div className={`transition-all duration-300 ${rightPanelOpen ? 'w-80' : 'w-0'} overflow-hidden`}>
+          <div className="h-full p-4">
+            <SystemCommandPanel onCommandClick={handleSystemCommand} />
+          </div>
+        </div>
       </div>
     </div>
   );
