@@ -7,6 +7,8 @@ import { LiveTranscript } from './LiveTranscript';
 import { SystemCommandPanel } from './SystemCommandPanel';
 import { PremiumGate } from './PremiumGate';
 import { UserProfile } from './UserProfile';
+import { FaceRecognition } from './FaceRecognition';
+import { JarvisLogo } from './JarvisLogo';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Card } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
@@ -20,7 +22,7 @@ import { ReminderService } from '@/services/ReminderService';
 import { SecurityService } from '@/services/SecurityService';
 import PlanService, { UserTier } from '@/services/PlanService';
 import { Button } from './ui/button';
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Crown, UserCircle } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Crown, UserCircle, Menu } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -39,11 +41,13 @@ export const JarvisAssistant = () => {
   const [isMuted, setIsMuted] = useState(false);
   const [apiKey, setApiKey] = useState<string>('');
   const [activeTab, setActiveTab] = useState('assistant');
-  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
-  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [leftPanelOpen, setLeftPanelOpen] = useState(false); // Start closed on mobile
+  const [rightPanelOpen, setRightPanelOpen] = useState(false); // Start closed on mobile
   const [showPremiumGate, setShowPremiumGate] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
+  const [showFaceRecognition, setShowFaceRecognition] = useState(false);
   const [userTier, setUserTier] = useState<UserTier>('free');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { toast } = useToast();
 
   const { speak, isSpeaking, stop: stopSpeaking } = useTextToSpeech();
@@ -438,38 +442,44 @@ export const JarvisAssistant = () => {
       {/* User Profile Modal */}
       <UserProfile isOpen={showUserProfile} onClose={() => setShowUserProfile(false)} />
       
-      {/* Header */}
-      <div className="h-16 bg-background/50 backdrop-blur-sm border-b border-jarvis-blue/20 flex items-center px-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setLeftPanelOpen(!leftPanelOpen)}
-          className="text-jarvis-blue hover:bg-jarvis-blue/10"
-        >
-          {leftPanelOpen ? <PanelLeftClose /> : <PanelLeftOpen />}
-        </Button>
+      {/* Header - Mobile Responsive */}
+      <div className="h-16 bg-background/50 backdrop-blur-sm border-b border-jarvis-blue/20 flex items-center px-2 md:px-4">
+        {/* Jarvis Logo on the left */}
+        <div className="flex items-center gap-2">
+          <JarvisLogo size={40} className="mr-2" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setLeftPanelOpen(!leftPanelOpen)}
+            className="text-jarvis-blue hover:bg-jarvis-blue/10 hidden md:flex"
+          >
+            {leftPanelOpen ? <PanelLeftClose /> : <PanelLeftOpen />}
+          </Button>
+        </div>
         
+        {/* Center Title - Mobile Responsive */}
         <div className="flex-1 text-center">
           <div className="flex items-center justify-center gap-2">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-jarvis-blue to-jarvis-blue-light bg-clip-text text-transparent">
-              JARVIS AI ASSISTANT
+            <h1 className="text-lg md:text-2xl font-bold bg-gradient-to-r from-jarvis-blue to-jarvis-blue-light bg-clip-text text-transparent">
+              JARVIS AI
             </h1>
             {userTier !== 'free' && (
               <span className={`px-2 py-1 rounded-full text-xs font-bold ${
                 userTier === 'basic' ? 'bg-blue-500' :
                 userTier === 'standard' ? 'bg-purple-500' :
                 'bg-gradient-to-r from-yellow-500 to-orange-500'
-              } text-white`}>
+              } text-white hidden md:inline`}>
                 {userTier.toUpperCase()}
               </span>
             )}
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground hidden md:block">
             {isActive ? '🟢 Active - Sun raha hun' : '⚪ Standby - Say "Hey Bro" to activate'}
           </p>
         </div>
         
-        <div className="flex items-center gap-2">
+        {/* Right Actions - Mobile Responsive */}
+        <div className="flex items-center gap-1 md:gap-2">
           <Button
             variant="ghost"
             size="icon"
@@ -477,7 +487,7 @@ export const JarvisAssistant = () => {
             className="text-jarvis-blue hover:bg-jarvis-blue/10"
             title="User Profile"
           >
-            <UserCircle />
+            <UserCircle className="h-5 w-5 md:h-6 md:w-6" />
           </Button>
           <Button
             variant="ghost"
@@ -486,23 +496,58 @@ export const JarvisAssistant = () => {
             className="text-yellow-500 hover:bg-yellow-500/10"
             title="Premium Plans"
           >
-            <Crown />
+            <Crown className="h-5 w-5 md:h-6 md:w-6" />
+          </Button>
+          {/* Mobile Menu Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="text-jarvis-blue hover:bg-jarvis-blue/10 md:hidden"
+          >
+            <Menu className="h-5 w-5" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setRightPanelOpen(!rightPanelOpen)}
-            className="text-jarvis-blue hover:bg-jarvis-blue/10"
+            className="text-jarvis-blue hover:bg-jarvis-blue/10 hidden md:flex"
           >
             {rightPanelOpen ? <PanelRightClose /> : <PanelRightOpen />}
           </Button>
         </div>
       </div>
 
-      {/* Main Content Area */}
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 bg-background/95 backdrop-blur-lg z-50 md:hidden">
+          <div className="flex flex-col h-full">
+            <div className="flex justify-between items-center p-4 border-b border-jarvis-blue/20">
+              <h2 className="text-lg font-bold text-jarvis-blue">Menu</h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                ✕
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-4">
+                <SystemCommandPanel onCommandClick={handleSystemCommand} />
+                {userTier === 'premium' && showFaceRecognition && (
+                  <FaceRecognition isActive={isActive} onFaceDetected={() => {}} />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Area - Mobile Responsive */}
       <div className="h-[calc(100vh-4rem)] flex">
-        {/* Left Panel - Live Transcript */}
-        <div className={`transition-all duration-300 ${leftPanelOpen ? 'w-80' : 'w-0'} overflow-hidden`}>
+        {/* Left Panel - Live Transcript - Hidden on mobile */}
+        <div className={`transition-all duration-300 ${leftPanelOpen ? 'w-80' : 'w-0'} overflow-hidden hidden md:block`}>
           <div className="h-full p-4">
             <LiveTranscript 
               entries={messages}
@@ -513,14 +558,19 @@ export const JarvisAssistant = () => {
           </div>
         </div>
 
-        {/* Center - Main Interface */}
+        {/* Center - Main Interface - Full width on mobile */}
         <div className="flex-1 flex flex-col">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
             <TabsList className="mx-auto mt-4 bg-background/50 border border-jarvis-blue/20">
               <TabsTrigger value="assistant">Assistant</TabsTrigger>
+              {userTier === 'premium' && (
+                <TabsTrigger value="face" onClick={() => setShowFaceRecognition(true)}>
+                  Face Recognition
+                </TabsTrigger>
+              )}
             </TabsList>
             
-            <TabsContent value="assistant" className="flex-1 flex flex-col items-center justify-center space-y-6 p-4">
+            <TabsContent value="assistant" className="flex-1 flex flex-col items-center justify-center space-y-4 md:space-y-6 p-2 md:p-4">
               {/* Voice Visualizer */}
               <div className="jarvis-fade-in">
                 <VoiceVisualizer 
@@ -530,26 +580,26 @@ export const JarvisAssistant = () => {
                 />
               </div>
 
-              {/* Status Message */}
-              <div className="text-center jarvis-fade-in max-w-2xl">
+              {/* Status Message - Mobile Responsive */}
+              <div className="text-center jarvis-fade-in max-w-2xl px-4">
                 {!isActive ? (
                   <div>
-                    <p className="text-jarvis-blue text-2xl mb-3 font-semibold">
+                    <p className="text-jarvis-blue text-lg md:text-2xl mb-3 font-semibold">
                       Say "Hey Bro" to activate JARVIS
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs md:text-sm text-muted-foreground">
                       Available commands: YouTube • Calculator • WhatsApp • Maps • Email • Weather • Timer • Translation
                     </p>
-                    <p className="text-xs text-jarvis-blue-light mt-2">
+                    <p className="text-xs text-jarvis-blue-light mt-2 hidden md:block">
                       Try: "play YouTube video" • "calculate 100 + 200" • "open WhatsApp" • "check weather"
                     </p>
                   </div>
                 ) : (
                   <div>
-                    <p className="text-jarvis-blue-light text-xl animate-pulse">
+                    <p className="text-jarvis-blue-light text-lg md:text-xl animate-pulse">
                       {isListening ? '🎤 Listening... (Hinglish supported)' : '🔊 Click the mic to speak'}
                     </p>
-                    <p className="text-sm text-muted-foreground mt-2">
+                    <p className="text-xs md:text-sm text-muted-foreground mt-2">
                       Command Examples: "YouTube pe Arijit Singh" • "Calculate karo 50 * 3" • "Weather check karo Delhi"
                     </p>
                   </div>
@@ -569,13 +619,13 @@ export const JarvisAssistant = () => {
                 />
               </div>
 
-              {/* Chat History - Compact View */}
-              <div className="jarvis-fade-in w-full max-w-3xl">
-                <Card className="bg-card/30 backdrop-blur-sm border-jarvis-blue/20 max-h-48 overflow-y-auto">
-                  <ScrollArea className="h-full p-4">
+              {/* Chat History - Compact View - Mobile Responsive */}
+              <div className="jarvis-fade-in w-full max-w-3xl px-2 md:px-0">
+                <Card className="bg-card/30 backdrop-blur-sm border-jarvis-blue/20 max-h-32 md:max-h-48 overflow-y-auto">
+                  <ScrollArea className="h-full p-2 md:p-4">
                     <div className="space-y-2">
                       {messages.slice(-3).map((msg) => (
-                        <div key={msg.id} className={`text-sm ${msg.isUser ? 'text-primary' : 'text-jarvis-blue'}`}>
+                        <div key={msg.id} className={`text-xs md:text-sm ${msg.isUser ? 'text-primary' : 'text-jarvis-blue'}`}>
                           <span className="font-medium">{msg.isUser ? 'You: ' : 'JARVIS: '}</span>
                           {msg.text}
                         </div>
@@ -584,14 +634,56 @@ export const JarvisAssistant = () => {
                   </ScrollArea>
                 </Card>
               </div>
+
+              {/* Mobile Live Transcript */}
+              <div className="md:hidden w-full px-2">
+                <Card className="bg-card/30 backdrop-blur-sm border-jarvis-blue/20 max-h-32">
+                  <ScrollArea className="h-full p-2">
+                    <LiveTranscript 
+                      entries={messages.slice(-5)}
+                      isListening={isListening}
+                      isSpeaking={isSpeaking}
+                      isMuted={isMuted}
+                    />
+                  </ScrollArea>
+                </Card>
+              </div>
             </TabsContent>
+
+            {/* Face Recognition Tab */}
+            {userTier === 'premium' && (
+              <TabsContent value="face" className="flex-1 flex flex-col items-center justify-center p-4">
+                <div className="w-full max-w-2xl">
+                  <FaceRecognition isActive={isActive} onFaceDetected={(data) => {
+                    if (data.detected) {
+                      toast({
+                        title: "Face Detected",
+                        description: `Confidence: ${(data.confidence * 100).toFixed(1)}%`,
+                      });
+                    }
+                  }} />
+                </div>
+              </TabsContent>
+            )}
           </Tabs>
         </div>
 
-        {/* Right Panel - System Commands */}
-        <div className={`transition-all duration-300 ${rightPanelOpen ? 'w-80' : 'w-0'} overflow-hidden`}>
+        {/* Right Panel - System Commands - Hidden on mobile */}
+        <div className={`transition-all duration-300 ${rightPanelOpen ? 'w-80' : 'w-0'} overflow-hidden hidden md:block`}>
           <div className="h-full p-4">
             <SystemCommandPanel onCommandClick={handleSystemCommand} />
+            {userTier === 'premium' && (
+              <div className="mt-4">
+                <FaceRecognition isActive={isActive} onFaceDetected={(data) => {
+                  if (data.detected) {
+                    toast({
+                      title: "Face Detected",
+                      description: `Confidence: ${(data.confidence * 100).toFixed(1)}%`,
+                    });
+                  }
+                }} />
+              </div>
+            )}
           </div>
         </div>
       </div>
