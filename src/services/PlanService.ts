@@ -126,12 +126,14 @@ class PlanService {
       'whatsapp_open': ['standard', 'premium'],
       'maps': ['standard', 'premium'],
       'all_system_commands': ['standard', 'premium'],
+      'weather': ['standard', 'premium'],
       
       // Premium features
       'face_recognition': ['premium'],
       'screen_automation': ['premium'],
       'study_assistant': ['premium'],
       'whatsapp_messaging': ['premium'],
+      'call_features': ['premium'],
       'priority_support': ['premium'],
       'custom_commands': ['premium'],
     };

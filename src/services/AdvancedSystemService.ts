@@ -255,9 +255,36 @@ export class AdvancedSystemService {
   
   private static checkWeather(city?: string): void {
     if (city) {
-      window.open(`https://www.google.com/search?q=weather+in+${encodeURIComponent(city)}`, '_blank');
+      // Open weather with detailed forecast
+      window.open(`https://www.google.com/search?q=weather+forecast+${encodeURIComponent(city)}`, '_blank');
+      
+      // Also try to get current weather via API (for future enhancement)
+      fetch(`https://wttr.in/${encodeURIComponent(city)}?format=j1`)
+        .then(response => response.json())
+        .then(data => {
+          if (data && data.current_condition) {
+            const temp = data.current_condition[0].temp_C;
+            const desc = data.current_condition[0].weatherDesc[0].value;
+            console.log(`Current weather in ${city}: ${temp}°C, ${desc}`);
+          }
+        })
+        .catch(error => console.error('Weather API error:', error));
     } else {
-      window.open('https://www.google.com/search?q=weather', '_blank');
+      // Get user's location weather
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            window.open(`https://www.google.com/search?q=weather+forecast+near+me`, '_blank');
+          },
+          () => {
+            window.open('https://www.google.com/search?q=weather+forecast', '_blank');
+          }
+        );
+      } else {
+        window.open('https://www.google.com/search?q=weather+forecast', '_blank');
+      }
     }
   }
   

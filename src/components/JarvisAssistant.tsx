@@ -6,6 +6,7 @@ import { PaymentPlans } from './PaymentPlans';
 import { LiveTranscript } from './LiveTranscript';
 import { SystemCommandPanel } from './SystemCommandPanel';
 import { PremiumGate } from './PremiumGate';
+import { UserProfile } from './UserProfile';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Card } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
@@ -19,7 +20,7 @@ import { ReminderService } from '@/services/ReminderService';
 import { SecurityService } from '@/services/SecurityService';
 import PlanService, { UserTier } from '@/services/PlanService';
 import { Button } from './ui/button';
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Crown } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Crown, UserCircle } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -41,6 +42,7 @@ export const JarvisAssistant = () => {
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [showPremiumGate, setShowPremiumGate] = useState(false);
+  const [showUserProfile, setShowUserProfile] = useState(false);
   const [userTier, setUserTier] = useState<UserTier>('free');
   const { toast } = useToast();
 
@@ -170,7 +172,7 @@ export const JarvisAssistant = () => {
         response = 'Kya search karna hai? Boliye "search [your query]"';
       }
     }
-    // Advanced System commands with tier checking
+    // Advanced System commands with tier checking and auto-execution
     else if (lowerCommand.includes('open') || lowerCommand.includes('kholo') || 
              lowerCommand.includes('play') || lowerCommand.includes('youtube') ||
              lowerCommand.includes('calculate') || lowerCommand.includes('whatsapp') ||
@@ -179,7 +181,8 @@ export const JarvisAssistant = () => {
              lowerCommand.includes('amazon') || lowerCommand.includes('weather') ||
              lowerCommand.includes('news') || lowerCommand.includes('battery') ||
              lowerCommand.includes('network') || lowerCommand.includes('timer') ||
-             lowerCommand.includes('translate') || lowerCommand.includes('screenshot')) {
+             lowerCommand.includes('translate') || lowerCommand.includes('screenshot') ||
+             lowerCommand.includes('call') || lowerCommand.includes('phone')) {
       
       // Check feature availability based on user tier
       const commandFeatureMap: Record<string, string> = {
@@ -196,6 +199,8 @@ export const JarvisAssistant = () => {
         'screen': 'screen_automation',
         'face': 'face_recognition',
         'study': 'study_assistant',
+        'call': userTier === 'premium' ? 'call_features' : '',
+        'phone': userTier === 'premium' ? 'call_features' : '',
       };
 
       // Find which feature this command needs
@@ -214,7 +219,50 @@ export const JarvisAssistant = () => {
           : "Is feature ke liye aapko upgrade karna padega. Crown icon pe click karo.";
         setShowPremiumGate(true);
       } else {
+        // Auto-execute the command
         response = AdvancedSystemService.executeCommand(command);
+        
+        // Special handling for YouTube music playback
+        if (lowerCommand.includes('play') && (lowerCommand.includes('music') || lowerCommand.includes('song') || lowerCommand.includes('gaana'))) {
+          const songMatch = command.match(/play\s+(.+?)(?:\s+music|\s+song|\s+gaana|$)/i);
+          if (songMatch) {
+            const songName = songMatch[1].replace(/music|song|gaana/gi, '').trim();
+            window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(songName + ' song')}`, '_blank');
+            response = `YouTube pe "${songName}" play kar raha hun... Pehla result automatically play hoga.`;
+          }
+        }
+        
+        // Special handling for calculator with direct calculation
+        if (lowerCommand.includes('calculate') || lowerCommand.includes('add') || lowerCommand.includes('subtract') || lowerCommand.includes('multiply') || lowerCommand.includes('divide')) {
+          const calcMatch = command.match(/(\d+(?:\.\d+)?)\s*([+\-*/]|\s+(?:plus|add|minus|subtract|multiply|divide|times))\s*(\d+(?:\.\d+)?)/gi);
+          if (calcMatch) {
+            try {
+              // Extract numbers and operation
+              const expression = command.replace(/plus|add/gi, '+')
+                                     .replace(/minus|subtract/gi, '-')
+                                     .replace(/multiply|times/gi, '*')
+                                     .replace(/divide|by/gi, '/')
+                                     .match(/[\d+\-*/.\s]+/);
+              if (expression) {
+                const result = Function('"use strict"; return (' + expression[0].replace(/[^0-9+\-*/().\s]/g, '') + ')')();
+                response = `Calculation ka result hai: ${result}`;
+              }
+            } catch (error) {
+              response = 'Calculation mein error aaya. Try again with proper numbers.';
+            }
+          }
+        }
+        
+        // Auto-handle call features for premium users
+        if ((lowerCommand.includes('call') || lowerCommand.includes('phone')) && userTier === 'premium') {
+          const numberMatch = command.match(/(\d{10})/);
+          if (numberMatch) {
+            window.open(`tel:${numberMatch[1]}`, '_blank');
+            response = `Calling ${numberMatch[1]}... Phone app open ho raha hai.`;
+          } else {
+            response = 'Phone number batao call karne ke liye. Example: "call 9876543210"';
+          }
+        }
       }
     }
     // Reminders
@@ -387,6 +435,9 @@ export const JarvisAssistant = () => {
       {/* Premium Gate Modal */}
       <PremiumGate isOpen={showPremiumGate} onClose={() => setShowPremiumGate(false)} />
       
+      {/* User Profile Modal */}
+      <UserProfile isOpen={showUserProfile} onClose={() => setShowUserProfile(false)} />
+      
       {/* Header */}
       <div className="h-16 bg-background/50 backdrop-blur-sm border-b border-jarvis-blue/20 flex items-center px-4">
         <Button
@@ -419,6 +470,15 @@ export const JarvisAssistant = () => {
         </div>
         
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowUserProfile(true)}
+            className="text-jarvis-blue hover:bg-jarvis-blue/10"
+            title="User Profile"
+          >
+            <UserCircle />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
