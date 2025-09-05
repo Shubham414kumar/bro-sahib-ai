@@ -9,12 +9,14 @@ import { PremiumGate } from './PremiumGate';
 import { UserProfile } from './UserProfile';
 import { FaceRecognition } from './FaceRecognition';
 import { JarvisLogo } from './JarvisLogo';
+import { CrossPlatformAudioCapture } from './CrossPlatformAudioCapture';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Card } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import { useToast } from '@/hooks/use-toast';
+import { useMobileDetection } from '@/hooks/useMobileDetection';
 import { MemoryService } from '@/services/MemoryService';
 import { SearchService } from '@/services/SearchService';
 import { AdvancedSystemService } from '@/services/AdvancedSystemService';
@@ -49,6 +51,7 @@ export const JarvisAssistant = () => {
   const [userTier, setUserTier] = useState<UserTier>('free');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { toast } = useToast();
+  const { isMobile, isIOS, isAndroid } = useMobileDetection();
 
   const { speak, isSpeaking, stop: stopSpeaking } = useTextToSpeech();
 
@@ -373,6 +376,15 @@ export const JarvisAssistant = () => {
   };
 
   const handleToggleListening = () => {
+    if (!speechSupported && !isMobile) {
+      toast({
+        title: 'Speech recognition not supported',
+        description: 'Please use a modern browser with speech recognition support.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     if (isListening) {
       stopListening();
     } else {
@@ -571,13 +583,32 @@ export const JarvisAssistant = () => {
             </TabsList>
             
             <TabsContent value="assistant" className="flex-1 flex flex-col items-center justify-center space-y-4 md:space-y-6 p-2 md:p-4">
-              {/* Voice Visualizer */}
+              {/* Voice Visualizer or Mobile Audio Capture */}
               <div className="jarvis-fade-in">
-                <VoiceVisualizer 
-                  isListening={isListening} 
-                  isSpeaking={isSpeaking} 
-                  isActive={isActive} 
-                />
+                {isMobile && !speechSupported ? (
+                  <CrossPlatformAudioCapture
+                    onAudioData={(transcript) => {
+                      const userMessage: ChatMessage = {
+                        id: Date.now().toString(),
+                        text: transcript,
+                        isUser: true,
+                        timestamp: new Date()
+                      };
+                      setMessages(prev => [...prev, userMessage]);
+                      if (isActive) {
+                        processCommand(transcript);
+                      }
+                    }}
+                    isListening={isListening}
+                    onToggleListening={handleToggleListening}
+                  />
+                ) : (
+                  <VoiceVisualizer 
+                    isListening={isListening} 
+                    isSpeaking={isSpeaking} 
+                    isActive={isActive} 
+                  />
+                )}
               </div>
 
               {/* Status Message - Mobile Responsive */}
