@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      orders: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          plan_id: string
+          razorpay_order_id: string
+          razorpay_payment_id: string | null
+          razorpay_signature: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          plan_id: string
+          razorpay_order_id: string
+          razorpay_payment_id?: string | null
+          razorpay_signature?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          plan_id?: string
+          razorpay_order_id?: string
+          razorpay_payment_id?: string | null
+          razorpay_signature?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plans: {
         Row: {
           created_at: string | null
@@ -104,6 +154,36 @@ export type Database = {
         }
         Relationships: []
       }
+      subscriptions: {
+        Row: {
+          created_at: string | null
+          end_date: string | null
+          id: string
+          start_date: string | null
+          status: string
+          tier: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          start_date?: string | null
+          status: string
+          tier: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          start_date?: string | null
+          status?: string
+          tier?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_purchases: {
         Row: {
           created_at: string | null
@@ -156,6 +236,14 @@ export type Database = {
       redeem_pass_and_subscribe: {
         Args: { pass_code_to_redeem: string; user_id_to_update: string }
         Returns: Json
+      }
+      redeem_premium_pass: {
+        Args: { pass_code: string }
+        Returns: Json
+      }
+      validate_premium_pass: {
+        Args: { pass_code: string }
+        Returns: boolean
       }
     }
     Enums: {
