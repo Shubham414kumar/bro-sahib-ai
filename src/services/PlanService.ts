@@ -47,63 +47,40 @@ class PlanService {
         return { success: false, message: 'Please login to redeem a pass' };
       }
 
-      // Check if pass exists and is not redeemed
-      const { data: pass, error: passError } = await supabase
-        .from('premium_passes')
-        .select('*')
-        .eq('code', code)
-        .single();
-
-      if (passError || !pass) {
-        return { success: false, message: 'Invalid premium pass code' };
+      // Rate limiting check (max 5 attempts per minute)
+      const recentAttempts = sessionStorage.getItem('pass_attempts');
+      const attempts = recentAttempts ? JSON.parse(recentAttempts) : [];
+      const now = Date.now();
+      const recentValidAttempts = attempts.filter((t: number) => now - t < 60000);
+      
+      if (recentValidAttempts.length >= 5) {
+        return { success: false, message: 'Too many attempts. Please wait a minute and try again.' };
       }
 
-      if (pass.is_redeemed) {
-        return { success: false, message: 'This pass has already been redeemed' };
+      // Use the secure server-side function to redeem the pass
+      const { data, error } = await supabase.rpc('redeem_premium_pass', { 
+        pass_code: code.trim().toUpperCase() 
+      });
+
+      // Update rate limiting
+      recentValidAttempts.push(now);
+      sessionStorage.setItem('pass_attempts', JSON.stringify(recentValidAttempts));
+
+      if (error) {
+        console.error('Error calling redeem function:', error);
+        return { success: false, message: 'Failed to redeem pass. Please try again.' };
       }
 
-      // Get premium plan
-      const { data: plan } = await supabase
-        .from('plans')
-        .select('*')
-        .eq('tier', 'premium')
-        .single();
-
-      if (!plan) {
-        return { success: false, message: 'Premium plan not found' };
+      if (!data) {
+        return { success: false, message: 'Invalid response from server' };
       }
 
-      // Update pass as redeemed
-      const { error: updateError } = await supabase
-        .from('premium_passes')
-        .update({ 
-          is_redeemed: true, 
-          redeemed_by: user.id,
-          redeemed_at: new Date().toISOString()
-        })
-        .eq('code', code);
-
-      if (updateError) {
-        return { success: false, message: 'Failed to redeem pass' };
+      // The function returns a JSON object with success and message
+      if (data.success) {
+        this.userTier = 'premium';
       }
-
-      // Create purchase record
-      const { error: purchaseError } = await supabase
-        .from('user_purchases')
-        .insert({
-          user_id: user.id,
-          plan_id: plan.id,
-          tier: 'premium',
-          is_active: true,
-          payment_id: `PASS_${code}`
-        });
-
-      if (purchaseError) {
-        return { success: false, message: 'Failed to activate premium' };
-      }
-
-      this.userTier = 'premium';
-      return { success: true, message: 'Premium access activated successfully!' };
+      
+      return data as { success: boolean; message: string };
     } catch (error) {
       console.error('Error redeeming pass:', error);
       return { success: false, message: 'An error occurred while redeeming the pass' };

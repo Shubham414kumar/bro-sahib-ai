@@ -64,6 +64,33 @@ export type Database = {
           },
         ]
       }
+      pass_redemption_attempts: {
+        Row: {
+          attempt_time: string | null
+          attempted_code: string | null
+          id: string
+          ip_address: unknown | null
+          success: boolean | null
+          user_id: string | null
+        }
+        Insert: {
+          attempt_time?: string | null
+          attempted_code?: string | null
+          id?: string
+          ip_address?: unknown | null
+          success?: boolean | null
+          user_id?: string | null
+        }
+        Update: {
+          attempt_time?: string | null
+          attempted_code?: string | null
+          id?: string
+          ip_address?: unknown | null
+          success?: boolean | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       plans: {
         Row: {
           created_at: string | null
