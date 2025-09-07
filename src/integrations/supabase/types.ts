@@ -260,6 +260,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_old_pass_attempts: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       redeem_pass_and_subscribe: {
         Args: { pass_code_to_redeem: string; user_id_to_update: string }
         Returns: Json
