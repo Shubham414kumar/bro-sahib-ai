@@ -25,7 +25,7 @@ class PlanService {
         .eq('is_active', true)
         .order('purchase_date', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (purchase) {
         this.userTier = purchase.tier as UserTier;
