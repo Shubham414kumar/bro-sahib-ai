@@ -9,6 +9,12 @@ export class SearchService {
 
   static async searchWeb(query: string): Promise<string> {
     try {
+      // Check if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        return 'Please sign in to use the search feature.';
+      }
+      
       // Validate and sanitize input
       const sanitizedQuery = SecurityService.sanitizeInput(query, this.MAX_QUERY_LENGTH);
       if (!sanitizedQuery) {
@@ -21,9 +27,12 @@ export class SearchService {
         return 'Too many searches. Please wait a moment before searching again.';
       }
 
-      // Use the edge function for DeepSeek search
+      // Use the edge function for DeepSeek search with authentication
       const { data, error } = await supabase.functions.invoke('deepseek-search', {
-        body: { query: sanitizedQuery }
+        body: { query: sanitizedQuery },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
       });
       
       if (error) {

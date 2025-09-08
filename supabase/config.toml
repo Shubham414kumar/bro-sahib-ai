@@ -18,14 +18,11 @@ security_update_password_require_reauthentication = true
 enable_signup = true
 enable_anonymous_sign_ins = false
 
-[functions.auth]
-verify_jwt = false
-
 [functions.create-razorpay-order]
-verify_jwt = false
+verify_jwt = true
 
 [functions.verify-razorpay-payment]
-verify_jwt = false
+verify_jwt = true
 
 [functions.deepseek-search]
-verify_jwt = false
+verify_jwt = true

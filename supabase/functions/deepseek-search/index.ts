@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,84 @@ serve(async (req) => {
   }
 
   try {
+    // Get Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get JWT from Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verify and get user from JWT
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check rate limit (10 searches per minute per user)
+    const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
+    
+    const { data: rateLimitData, error: rateLimitError } = await supabaseClient
+      .from('rate_limits')
+      .select('request_count')
+      .eq('user_id', user.id)
+      .eq('endpoint', 'deepseek-search')
+      .gte('window_start', oneMinuteAgo)
+      .maybeSingle();
+
+    if (rateLimitError) {
+      console.error('Rate limit check error:', rateLimitError);
+    }
+
+    const currentCount = rateLimitData?.request_count || 0;
+    
+    if (currentCount >= 10) {
+      // Log security event
+      await supabaseClient.from('security_events').insert({
+        user_id: user.id,
+        event_type: 'rate_limit_exceeded',
+        event_details: { endpoint: 'deepseek-search', count: currentCount },
+        ip_address: req.headers.get('CF-Connecting-IP') || req.headers.get('X-Forwarded-For'),
+        user_agent: req.headers.get('User-Agent')
+      });
+
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Update rate limit
+    if (rateLimitData) {
+      await supabaseClient
+        .from('rate_limits')
+        .update({ request_count: currentCount + 1, updated_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .eq('endpoint', 'deepseek-search')
+        .gte('window_start', oneMinuteAgo);
+    } else {
+      await supabaseClient
+        .from('rate_limits')
+        .insert({
+          user_id: user.id,
+          endpoint: 'deepseek-search',
+          request_count: 1,
+          window_start: new Date().toISOString()
+        });
+    }
+
     const { query } = await req.json();
     
     if (!query || typeof query !== 'string') {

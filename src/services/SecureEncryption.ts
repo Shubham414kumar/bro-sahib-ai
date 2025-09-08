@@ -1,11 +1,15 @@
+import { supabase } from '@/integrations/supabase/client';
+
 /**
- * Secure encryption service with proper key management
+ * Secure encryption service with enhanced key management and rotation
  */
 export class SecureEncryption {
   private static readonly KEY_NAME = 'jarvis-encryption-key';
+  private static readonly KEY_ROTATION_HOURS = 24; // Rotate keys every 24 hours
+  private static keyCache: CryptoKey | null = null;
   
   /**
-   * Generate a new encryption key for the session
+   * Generate a new encryption key for the session with metadata tracking
    */
   static async generateSessionKey(): Promise<CryptoKey> {
     const key = await crypto.subtle.generateKey(
@@ -17,24 +21,65 @@ export class SecureEncryption {
       ['encrypt', 'decrypt']
     );
     
-    // Export and store in sessionStorage (cleared on browser close)
+    // Store key metadata
+    const keyMetadata = {
+      generated: Date.now(),
+      rotationDue: Date.now() + (this.KEY_ROTATION_HOURS * 3600000)
+    };
+    
+    // Export and store in sessionStorage with metadata
     const exported = await crypto.subtle.exportKey('jwk', key);
-    sessionStorage.setItem(this.KEY_NAME, JSON.stringify(exported));
+    sessionStorage.setItem(this.KEY_NAME, JSON.stringify({
+      key: exported,
+      metadata: keyMetadata
+    }));
+    
+    // Cache the key in memory
+    this.keyCache = key;
+    
+    // Log key generation event if user is authenticated
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      // Note: In production, you'd want to log this to your security events table
+      console.log('New encryption key generated for user:', session.user.id);
+    }
     
     return key;
   }
   
   /**
-   * Get or create the session encryption key
+   * Get or create the session encryption key with automatic rotation
    */
   static async getSessionKey(): Promise<CryptoKey> {
-    // Check if we have a key in sessionStorage
-    const storedKey = sessionStorage.getItem(this.KEY_NAME);
+    // Return cached key if available and valid
+    if (this.keyCache) {
+      const storedData = sessionStorage.getItem(this.KEY_NAME);
+      if (storedData) {
+        try {
+          const { metadata } = JSON.parse(storedData);
+          if (metadata && metadata.rotationDue > Date.now()) {
+            return this.keyCache;
+          }
+        } catch (error) {
+          console.warn('Key metadata check failed');
+        }
+      }
+    }
     
-    if (storedKey) {
+    // Check if we have a valid key in sessionStorage
+    const storedData = sessionStorage.getItem(this.KEY_NAME);
+    
+    if (storedData) {
       try {
-        const jwk = JSON.parse(storedKey);
-        return await crypto.subtle.importKey(
+        const { key: jwk, metadata } = JSON.parse(storedData);
+        
+        // Check if key needs rotation
+        if (metadata && metadata.rotationDue < Date.now()) {
+          console.log('Key rotation required');
+          return this.generateSessionKey();
+        }
+        
+        const key = await crypto.subtle.importKey(
           'jwk',
           jwk,
           {
@@ -44,6 +89,10 @@ export class SecureEncryption {
           true,
           ['encrypt', 'decrypt']
         );
+        
+        // Cache the imported key
+        this.keyCache = key;
+        return key;
       } catch (error) {
         console.warn('Failed to import stored key, generating new one');
       }
@@ -130,5 +179,21 @@ export class SecureEncryption {
    */
   static clearSessionKey(): void {
     sessionStorage.removeItem(this.KEY_NAME);
+    this.keyCache = null;
+  }
+  
+  /**
+   * Validate if the current key is still valid
+   */
+  static async validateKey(): Promise<boolean> {
+    const storedData = sessionStorage.getItem(this.KEY_NAME);
+    if (!storedData) return false;
+    
+    try {
+      const { metadata } = JSON.parse(storedData);
+      return metadata && metadata.rotationDue > Date.now();
+    } catch {
+      return false;
+    }
   }
 }
