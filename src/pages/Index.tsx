@@ -1,31 +1,37 @@
 import { JarvisAssistant } from '@/components/JarvisAssistant';
+import { NavigationBar } from '@/components/NavigationBar';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
-import { CreditCard } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 
 const Index = () => {
   const { user, signOut } = useAuth();
-  const navigate = useNavigate();
   
   return (
     <div className="min-h-screen">
-      <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => navigate('/payment')}
-          className="gap-2"
-        >
-          <CreditCard className="h-4 w-4" />
-          <span className="hidden sm:inline">Upgrade</span>
-        </Button>
-        <span className="text-xs sm:text-sm text-muted-foreground hidden md:inline">{user?.email}</span>
-        <Button variant="outline" size="sm" onClick={signOut}>
-          Sign Out
-        </Button>
+      {/* Top Bar */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-b border-jarvis-blue/20">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <NavigationBar />
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground hidden md:inline">{user?.email}</span>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={signOut}
+              className="text-muted-foreground hover:text-red-400"
+              title="Sign Out"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </div>
-      <JarvisAssistant />
+      
+      {/* Main Content */}
+      <div className="pt-16 pb-20 md:pb-8">
+        <JarvisAssistant />
+      </div>
     </div>
   );
 };

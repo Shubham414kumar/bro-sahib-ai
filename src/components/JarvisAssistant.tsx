@@ -5,6 +5,7 @@ import { ControlPanel } from './ControlPanel';
 import { PaymentPlans } from './PaymentPlans';
 import { LiveTranscript } from './LiveTranscript';
 import { SystemCommandPanel } from './SystemCommandPanel';
+import { SystemStatusPanel } from './SystemStatusPanel';
 import { PremiumGate } from './PremiumGate';
 import { UserProfile } from './UserProfile';
 import { FaceRecognition } from './FaceRecognition';
@@ -38,7 +39,23 @@ const WAKE_PHRASES = ['hey bro', 'hai bro', 'हे ब्रो', 'हाय �
 
 export const JarvisAssistant = () => {
   const [isActive, setIsActive] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    // Load messages from localStorage on mount
+    const saved = localStorage.getItem('jarvis-messages');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.map((m: any) => ({
+          ...m,
+          timestamp: new Date(m.timestamp)
+        }));
+      } catch (e) {
+        console.error('Failed to load messages:', e);
+        return [];
+      }
+    }
+    return [];
+  });
   const [activeFeatures, setActiveFeatures] = useState<string[]>(['email', 'youtube']);
   const [isMuted, setIsMuted] = useState(false);
   const [apiKey, setApiKey] = useState<string>('');
@@ -54,6 +71,13 @@ export const JarvisAssistant = () => {
   const { isMobile, isIOS, isAndroid } = useMobileDetection();
 
   const { speak, isSpeaking, stop: stopSpeaking } = useTextToSpeech();
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem('jarvis-messages', JSON.stringify(messages));
+    }
+  }, [messages]);
 
   // Initialize services on mount
   useEffect(() => {
@@ -346,48 +370,96 @@ export const JarvisAssistant = () => {
     };
     setMessages(prev => [...prev, aiMessage]);
 
-    // Speak response if not muted
-    if (!isMuted && response) {
+    // Speak response if not muted and voice enabled
+    const voiceEnabled = localStorage.getItem('jarvis-voice-enabled') !== 'false';
+    if (!isMuted && response && voiceEnabled) {
       console.log('Speaking response:', response);
       speak(response);
     } else {
-      console.log('Not speaking - muted:', isMuted, 'response:', !!response);
+      console.log('Not speaking - muted:', isMuted, 'voiceEnabled:', voiceEnabled, 'response:', !!response);
     }
   };
 
   const handleToggleListening = () => {
     console.log('🎯 Toggle Listening clicked');
-    console.log('Current state - isListening:', isListening, 'isActive:', isActive, 'isMobile:', isMobile);
+    console.log('Current state - isListening:', isListening, 'isActive:', isActive);
     
     if (!speechSupported && !isMobile) {
       console.log('❌ Speech not supported on this browser');
       toast({
-        title: 'Speech recognition not supported',
-        description: 'Please use a modern browser with speech recognition support.',
+        title: 'Microphone Not Available',
+        description: 'Your browser does not support speech recognition. Please use Chrome or Edge.',
         variant: 'destructive'
       });
       return;
     }
     
     if (isListening) {
-      console.log('🛑 Stopping listening and deactivating JARVIS');
+      console.log('🛑 Stopping JARVIS');
       stopListening();
       stopSpeaking();
       setIsActive(false);
+      
+      const goodbyeMsg = Math.random() > 0.5 
+        ? 'Goodbye! See you soon, bro.' 
+        : 'JARVIS signing off. Take care!';
+      
+      const aiMessage: ChatMessage = {
+        id: Date.now().toString(),
+        text: goodbyeMsg,
+        isUser: false,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, aiMessage]);
+      
       toast({
         title: 'JARVIS Stopped',
-        description: 'Voice assistant has been stopped',
+        description: goodbyeMsg,
       });
     } else {
-      console.log('▶️ Starting listening and activating JARVIS');
-      startListening();
-      setIsActive(true);
-      const greeting = 'JARVIS activated. How can I help you?';
-      speak(greeting);
-      toast({
-        title: 'JARVIS Started',
-        description: 'Voice assistant is now listening',
-      });
+      console.log('▶️ Starting JARVIS');
+      
+      // Request microphone permission first
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ audio: true })
+          .then(() => {
+            startListening();
+            setIsActive(true);
+            
+            const greeting = Math.random() > 0.5
+              ? 'Hey there! I\'m online and ready to help, bro.'
+              : 'JARVIS activated. How can I assist you today?';
+            
+            const voiceEnabled = localStorage.getItem('jarvis-voice-enabled') !== 'false';
+            if (voiceEnabled) {
+              speak(greeting);
+            }
+            
+            const aiMessage: ChatMessage = {
+              id: Date.now().toString(),
+              text: greeting,
+              isUser: false,
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, aiMessage]);
+            
+            toast({
+              title: 'JARVIS Started',
+              description: 'Voice assistant is now listening',
+            });
+          })
+          .catch((error) => {
+            console.error('Microphone permission denied:', error);
+            toast({
+              title: 'Microphone Access Denied',
+              description: 'Please allow microphone access to use voice features.',
+              variant: 'destructive'
+            });
+          });
+      } else {
+        startListening();
+        setIsActive(true);
+      }
     }
   };
 
@@ -452,10 +524,10 @@ export const JarvisAssistant = () => {
       <UserProfile isOpen={showUserProfile} onClose={() => setShowUserProfile(false)} />
       
       {/* Header - Mobile Responsive */}
-      <div className="h-16 bg-background/50 backdrop-blur-sm border-b border-jarvis-blue/20 flex items-center px-2 md:px-4">
+      <div className="h-14 sm:h-16 bg-background/50 backdrop-blur-sm border-b border-jarvis-blue/20 flex items-center px-2 sm:px-4">
         {/* Jarvis Logo on the left */}
         <div className="flex items-center gap-2">
-          <JarvisLogo size={40} className="mr-2" />
+          <JarvisLogo size={isMobile ? 32 : 40} className="mr-1 sm:mr-2" />
           <Button
             variant="ghost"
             size="icon"
@@ -469,11 +541,11 @@ export const JarvisAssistant = () => {
         {/* Center Title - Mobile Responsive */}
         <div className="flex-1 text-center">
           <div className="flex items-center justify-center gap-2">
-            <h1 className="text-lg md:text-2xl font-bold bg-gradient-to-r from-jarvis-blue to-jarvis-blue-light bg-clip-text text-transparent">
+            <h1 className="text-base sm:text-lg md:text-2xl font-bold bg-gradient-to-r from-jarvis-blue to-jarvis-blue-light bg-clip-text text-transparent">
               JARVIS AI
             </h1>
             {userTier !== 'free' && (
-              <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+              <span className={`px-2 py-0.5 sm:py-1 rounded-full text-xs font-bold ${
                 userTier === 'basic' ? 'bg-blue-500' :
                 userTier === 'standard' ? 'bg-purple-500' :
                 'bg-gradient-to-r from-yellow-500 to-orange-500'
@@ -482,39 +554,43 @@ export const JarvisAssistant = () => {
               </span>
             )}
           </div>
-          <p className="text-xs text-muted-foreground hidden md:block">
-            {isActive ? '🟢 Active - Sun raha hun' : '⚪ Standby - Say "Hey Bro" to activate'}
+          <p className="text-xs text-muted-foreground hidden sm:block">
+            {isListening 
+              ? '🟢 Listening - I can hear you' 
+              : isActive 
+                ? '🟡 Ready - Press Start to begin'
+                : '⚪ Offline - Press Start to activate'}
           </p>
         </div>
         
         {/* Right Actions - Mobile Responsive */}
-        <div className="flex items-center gap-1 md:gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setShowUserProfile(true)}
-            className="text-jarvis-blue hover:bg-jarvis-blue/10"
+            className="text-jarvis-blue hover:bg-jarvis-blue/10 h-8 w-8 sm:h-10 sm:w-10"
             title="User Profile"
           >
-            <UserCircle className="h-5 w-5 md:h-6 md:w-6" />
+            <UserCircle className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setShowPremiumGate(true)}
-            className="text-yellow-500 hover:bg-yellow-500/10"
+            className="text-yellow-500 hover:bg-yellow-500/10 h-8 w-8 sm:h-10 sm:w-10"
             title="Premium Plans"
           >
-            <Crown className="h-5 w-5 md:h-6 md:w-6" />
+            <Crown className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
           </Button>
           {/* Mobile Menu Button */}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="text-jarvis-blue hover:bg-jarvis-blue/10 md:hidden"
+            className="text-jarvis-blue hover:bg-jarvis-blue/10 md:hidden h-8 w-8"
           >
-            <Menu className="h-5 w-5" />
+            <Menu className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
@@ -554,16 +630,27 @@ export const JarvisAssistant = () => {
       )}
 
       {/* Main Content Area - Mobile Responsive */}
-      <div className="h-[calc(100vh-4rem)] flex flex-col md:flex-row">
+      <div className="h-[calc(100vh-3.5rem)] sm:h-[calc(100vh-4rem)] flex flex-col md:flex-row">
         {/* Left Panel - Live Transcript - Hidden on mobile */}
         <div className={`transition-all duration-300 ${leftPanelOpen ? 'w-80' : 'w-0'} overflow-hidden hidden md:block`}>
           <div className="h-full p-4">
-            <LiveTranscript 
-              entries={messages}
-              isListening={isListening}
-              isSpeaking={isSpeaking}
-              isMuted={isMuted}
-            />
+            <Card className="h-full bg-card/50 backdrop-blur-sm border-jarvis-blue/30">
+              <div className="p-4">
+                <h3 className="text-lg font-semibold text-jarvis-blue mb-4">Quick Stats</h3>
+                <div className="space-y-3">
+                  <div className="p-3 rounded-lg bg-background/30">
+                    <p className="text-xs text-muted-foreground">Messages</p>
+                    <p className="text-xl font-bold text-jarvis-blue">{messages.length}</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-background/30">
+                    <p className="text-xs text-muted-foreground">Status</p>
+                    <p className="text-sm font-bold text-green-400">
+                      {isListening ? 'Listening' : 'Standby'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Card>
           </div>
         </div>
 
@@ -703,19 +790,7 @@ export const JarvisAssistant = () => {
         {/* Right Panel - System Commands - Hidden on mobile */}
         <div className={`transition-all duration-300 ${rightPanelOpen ? 'w-80' : 'w-0'} overflow-hidden hidden md:block`}>
           <div className="h-full p-4">
-            <SystemCommandPanel onCommandClick={handleSystemCommand} />
-            {userTier === 'premium' && (
-              <div className="mt-4">
-                <FaceRecognition isActive={isActive} onFaceDetected={(data) => {
-                  if (data.detected) {
-                    toast({
-                      title: "Face Detected",
-                      description: `Confidence: ${(data.confidence * 100).toFixed(1)}%`,
-                    });
-                  }
-                }} />
-              </div>
-            )}
+            <SystemStatusPanel />
           </div>
         </div>
       </div>

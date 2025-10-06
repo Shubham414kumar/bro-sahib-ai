@@ -178,20 +178,20 @@ export const PaymentPlans = () => {
   };
 
   return (
-    <div className="w-full">
-      <div className="text-center mb-8">
-        <h3 className="text-2xl font-bold mb-2">Choose Your Plan</h3>
-        <p className="text-muted-foreground">
+    <div className="w-full px-2 sm:px-0">
+      <div className="text-center mb-6 sm:mb-8">
+        <h3 className="text-xl sm:text-2xl font-bold mb-2">Choose Your Plan</h3>
+        <p className="text-sm sm:text-base text-muted-foreground">
           Unlock powerful features for your Jarvis Assistant
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {plans.map((plan) => (
           <Card 
             key={plan.id} 
             className={cn(
-              "relative overflow-hidden transition-all duration-300 hover:shadow-xl",
+              "relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105",
               plan.tier === 'premium' && "border-2 border-primary"
             )}
           >
@@ -207,25 +207,25 @@ export const PaymentPlans = () => {
               )}>
                 {getIconForTier(plan.tier)}
               </div>
-              <CardTitle className="text-xl">{plan.name}</CardTitle>
-              <CardDescription className="text-sm">{plan.description}</CardDescription>
-              <div className="mt-4">
-                <span className="text-3xl font-bold">₹{(plan.price / 100).toFixed(0)}</span>
-                <span className="text-muted-foreground ml-2 text-sm">one-time</span>
+              <CardTitle className="text-lg sm:text-xl">{plan.name}</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">{plan.description}</CardDescription>
+              <div className="mt-3 sm:mt-4">
+                <span className="text-2xl sm:text-3xl font-bold">₹{(plan.price / 100).toFixed(0)}</span>
+                <span className="text-muted-foreground ml-2 text-xs sm:text-sm">one-time</span>
               </div>
             </CardHeader>
             <CardContent>
-              <ul className="space-y-2 mb-6">
+              <ul className="space-y-2 mb-4 sm:mb-6">
                 {plan.features.map((feature, index) => (
                   <li key={index} className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span className="text-xs">{feature}</span>
+                    <Check className="h-3 w-3 sm:h-4 sm:w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm">{feature}</span>
                   </li>
                 ))}
               </ul>
               <Button
                 className={cn(
-                  "w-full",
+                  "w-full text-sm sm:text-base",
                   plan.tier === 'premium' && "bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
                 )}
                 size="lg"
