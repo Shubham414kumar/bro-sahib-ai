@@ -63,35 +63,15 @@ export const JarvisAssistant = () => {
   }, []);
 
   const handleSpeechResult = useCallback((result: any) => {
-    console.log('Speech result received:', result);
+    console.log('🎤 Speech result received:', result);
     if (result.isFinal) {
       const transcript = result.transcript.toLowerCase().trim();
-      console.log('Processing transcript:', transcript);
-      console.log('🎤 Speech Result:', transcript);
+      console.log('📝 Processing transcript:', transcript);
       console.log('🤖 Is Active:', isActive);
       
-      // Check for wake phrase
-      if (!isActive && WAKE_PHRASES.some(phrase => transcript.includes(phrase))) {
-        console.log('🚀 Wake phrase detected!');
-        setIsActive(true);
-        const hinglishGreeting = Math.random() > 0.5 
-          ? 'Hello bro! JARVIS active ho gaya hai. Kya kaam hai?'
-          : 'Hey! JARVIS is now active. How can I help you?';
-        speak(hinglishGreeting);
-        
-        const newMessage: ChatMessage = {
-          id: Date.now().toString(),
-          text: hinglishGreeting,
-          isUser: false,
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, newMessage]);
-        return;
-      }
-
-      // Process commands when active
-      if (isActive && transcript) {
-        console.log('✅ Processing command since JARVIS is active');
+      // Always process commands when transcript is received and listening
+      if (transcript) {
+        console.log('✅ Processing command:', transcript);
         
         const userMessage: ChatMessage = {
           id: Date.now().toString(),
@@ -105,7 +85,7 @@ export const JarvisAssistant = () => {
         processCommand(transcript);
       }
     }
-  }, [isActive]); // Removed speak and processCommand from dependencies to prevent re-renders
+  }, [isActive]);
 
   const { isListening, startListening, stopListening, isSupported: speechSupported } = useSpeechRecognition(
     handleSpeechResult,
@@ -376,7 +356,11 @@ export const JarvisAssistant = () => {
   };
 
   const handleToggleListening = () => {
+    console.log('🎯 Toggle Listening clicked');
+    console.log('Current state - isListening:', isListening, 'isActive:', isActive, 'isMobile:', isMobile);
+    
     if (!speechSupported && !isMobile) {
+      console.log('❌ Speech not supported on this browser');
       toast({
         title: 'Speech recognition not supported',
         description: 'Please use a modern browser with speech recognition support.',
@@ -386,9 +370,24 @@ export const JarvisAssistant = () => {
     }
     
     if (isListening) {
+      console.log('🛑 Stopping listening and deactivating JARVIS');
       stopListening();
+      stopSpeaking();
+      setIsActive(false);
+      toast({
+        title: 'JARVIS Stopped',
+        description: 'Voice assistant has been stopped',
+      });
     } else {
+      console.log('▶️ Starting listening and activating JARVIS');
       startListening();
+      setIsActive(true);
+      const greeting = 'JARVIS activated. How can I help you?';
+      speak(greeting);
+      toast({
+        title: 'JARVIS Started',
+        description: 'Voice assistant is now listening',
+      });
     }
   };
 
@@ -436,14 +435,12 @@ export const JarvisAssistant = () => {
     console.log('DeepSeek API is now configured through edge function');
   }, []);
 
-  // Auto-start listening when component mounts
+  // Don't auto-start - let user control it
   useEffect(() => {
-    const timer = setTimeout(() => {
-      startListening();
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, []); // Empty dependency array to run only once on mount
+    console.log('🚀 JARVIS Assistant mounted and ready');
+    console.log('Device info - Mobile:', isMobile, 'iOS:', isIOS, 'Android:', isAndroid);
+    console.log('Speech supported:', speechSupported);
+  }, []);
 
 
   return (
@@ -557,7 +554,7 @@ export const JarvisAssistant = () => {
       )}
 
       {/* Main Content Area - Mobile Responsive */}
-      <div className="h-[calc(100vh-4rem)] flex">
+      <div className="h-[calc(100vh-4rem)] flex flex-col md:flex-row">
         {/* Left Panel - Live Transcript - Hidden on mobile */}
         <div className={`transition-all duration-300 ${leftPanelOpen ? 'w-80' : 'w-0'} overflow-hidden hidden md:block`}>
           <div className="h-full p-4">
@@ -571,7 +568,7 @@ export const JarvisAssistant = () => {
         </div>
 
         {/* Center - Main Interface - Full width on mobile */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col overflow-y-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
             <TabsList className="mx-auto mt-4 bg-background/50 border border-jarvis-blue/20">
               <TabsTrigger value="assistant">Assistant</TabsTrigger>
@@ -582,12 +579,13 @@ export const JarvisAssistant = () => {
               )}
             </TabsList>
             
-            <TabsContent value="assistant" className="flex-1 flex flex-col items-center justify-center space-y-4 md:space-y-6 p-2 md:p-4">
+            <TabsContent value="assistant" className="flex-1 flex flex-col items-center justify-center space-y-3 sm:space-y-4 md:space-y-6 p-2 md:p-4">
               {/* Voice Visualizer or Mobile Audio Capture */}
-              <div className="jarvis-fade-in">
+              <div className="jarvis-fade-in w-full flex justify-center">
                 {isMobile && !speechSupported ? (
                   <CrossPlatformAudioCapture
                     onAudioData={(transcript) => {
+                      console.log('📱 Mobile audio transcript received:', transcript);
                       const userMessage: ChatMessage = {
                         id: Date.now().toString(),
                         text: transcript,
@@ -595,9 +593,7 @@ export const JarvisAssistant = () => {
                         timestamp: new Date()
                       };
                       setMessages(prev => [...prev, userMessage]);
-                      if (isActive) {
-                        processCommand(transcript);
-                      }
+                      processCommand(transcript);
                     }}
                     isListening={isListening}
                     onToggleListening={handleToggleListening}
@@ -612,26 +608,26 @@ export const JarvisAssistant = () => {
               </div>
 
               {/* Status Message - Mobile Responsive */}
-              <div className="text-center jarvis-fade-in max-w-2xl px-4">
-                {!isActive ? (
-                  <div>
-                    <p className="text-jarvis-blue text-lg md:text-2xl mb-3 font-semibold">
-                      Say "Hey Bro" to activate JARVIS
+              <div className="text-center jarvis-fade-in max-w-2xl px-2 sm:px-4 w-full">
+                {!isListening ? (
+                  <div className="space-y-2 sm:space-y-3">
+                    <p className="text-jarvis-blue text-base sm:text-lg md:text-2xl font-semibold">
+                      Click Start to activate JARVIS
                     </p>
-                    <p className="text-xs md:text-sm text-muted-foreground">
-                      Available commands: YouTube • Calculator • WhatsApp • Maps • Email • Weather • Timer • Translation
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      Available: YouTube • Calculator • WhatsApp • Maps • Email • Weather
                     </p>
-                    <p className="text-xs text-jarvis-blue-light mt-2 hidden md:block">
-                      Try: "play YouTube video" • "calculate 100 + 200" • "open WhatsApp" • "check weather"
+                    <p className="text-xs text-jarvis-blue-light mt-2 hidden sm:block">
+                      Try: "play YouTube video" • "calculate 100 + 200" • "open WhatsApp"
                     </p>
                   </div>
                 ) : (
-                  <div>
-                    <p className="text-jarvis-blue-light text-lg md:text-xl animate-pulse">
-                      {isListening ? '🎤 Listening... (Hinglish supported)' : '🔊 Click the mic to speak'}
+                  <div className="space-y-2">
+                    <p className="text-jarvis-blue-light text-base sm:text-lg md:text-xl animate-pulse">
+                      {isActive ? '🎤 Listening... Speak now!' : '⏸️ Ready to listen'}
                     </p>
-                    <p className="text-xs md:text-sm text-muted-foreground mt-2">
-                      Command Examples: "YouTube pe Arijit Singh" • "Calculate karo 50 * 3" • "Weather check karo Delhi"
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      Examples: "YouTube pe song" • "Calculate 50 * 3" • "What time is it"
                     </p>
                   </div>
                 )}
@@ -652,15 +648,21 @@ export const JarvisAssistant = () => {
 
               {/* Chat History - Compact View - Mobile Responsive */}
               <div className="jarvis-fade-in w-full max-w-3xl px-2 md:px-0">
-                <Card className="bg-card/30 backdrop-blur-sm border-jarvis-blue/20 max-h-32 md:max-h-48 overflow-y-auto">
-                  <ScrollArea className="h-full p-2 md:p-4">
-                    <div className="space-y-2">
-                      {messages.slice(-3).map((msg) => (
-                        <div key={msg.id} className={`text-xs md:text-sm ${msg.isUser ? 'text-primary' : 'text-jarvis-blue'}`}>
-                          <span className="font-medium">{msg.isUser ? 'You: ' : 'JARVIS: '}</span>
-                          {msg.text}
-                        </div>
-                      ))}
+                <Card className="bg-card/30 backdrop-blur-sm border-jarvis-blue/20 max-h-40 sm:max-h-48 md:max-h-60 overflow-y-auto">
+                  <ScrollArea className="h-full p-2 sm:p-3 md:p-4">
+                    <div className="space-y-1 sm:space-y-2">
+                      {messages.length === 0 ? (
+                        <p className="text-xs sm:text-sm text-muted-foreground text-center py-4">
+                          No messages yet. Start speaking to JARVIS!
+                        </p>
+                      ) : (
+                        messages.slice(-5).map((msg) => (
+                          <div key={msg.id} className={`text-xs sm:text-sm ${msg.isUser ? 'text-primary' : 'text-jarvis-blue'}`}>
+                            <span className="font-medium">{msg.isUser ? 'You: ' : 'JARVIS: '}</span>
+                            {msg.text}
+                          </div>
+                        ))
+                      )}
                     </div>
                   </ScrollArea>
                 </Card>
@@ -668,14 +670,13 @@ export const JarvisAssistant = () => {
 
               {/* Mobile Live Transcript */}
               <div className="md:hidden w-full px-2">
-                <Card className="bg-card/30 backdrop-blur-sm border-jarvis-blue/20 max-h-32">
+                <Card className="bg-card/30 backdrop-blur-sm border-jarvis-blue/20 max-h-24 sm:max-h-32">
                   <ScrollArea className="h-full p-2">
-                    <LiveTranscript 
-                      entries={messages.slice(-5)}
-                      isListening={isListening}
-                      isSpeaking={isSpeaking}
-                      isMuted={isMuted}
-                    />
+                    <div className="text-xs">
+                      <p className="text-muted-foreground mb-1">
+                        Status: {isListening ? '🎤 Listening' : '⏸️ Paused'} | {isSpeaking ? '🔊 Speaking' : '🔇 Silent'}
+                      </p>
+                    </div>
                   </ScrollArea>
                 </Card>
               </div>
