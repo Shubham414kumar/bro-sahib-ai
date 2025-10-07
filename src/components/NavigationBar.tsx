@@ -1,10 +1,14 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, MessageSquare, Activity, CreditCard, Settings } from 'lucide-react';
+import { Home, MessageSquare, Activity, CreditCard, Settings, BookOpen, AppWindow, Monitor, Camera } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { path: '/', label: 'Home', icon: Home },
   { path: '/transcript', label: 'Chat', icon: MessageSquare },
+  { path: '/study', label: 'Study', icon: BookOpen },
+  { path: '/apps', label: 'Apps', icon: AppWindow },
+  { path: '/automation', label: 'Auto', icon: Monitor },
+  { path: '/face', label: 'Face', icon: Camera },
   { path: '/system', label: 'System', icon: Activity },
   { path: '/payment', label: 'Payment', icon: CreditCard },
   { path: '/settings', label: 'Settings', icon: Settings },

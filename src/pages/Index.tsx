@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { JarvisAssistant } from '@/components/JarvisAssistant';
+import WakeWordDetector from '@/components/WakeWordDetector';
 import { NavigationBar } from '@/components/NavigationBar';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -6,6 +8,7 @@ import { LogOut } from 'lucide-react';
 
 const Index = () => {
   const { user, signOut } = useAuth();
+  const [isJarvisActive, setIsJarvisActive] = useState(false);
   
   return (
     <div className="min-h-screen">
@@ -30,7 +33,11 @@ const Index = () => {
       
       {/* Main Content */}
       <div className="pt-16 pb-20 md:pb-8">
-        <JarvisAssistant />
+        <JarvisAssistant onActiveChange={setIsJarvisActive} />
+        <WakeWordDetector 
+          onWakeWordDetected={() => setIsJarvisActive(true)}
+          isActive={isJarvisActive}
+        />
       </div>
     </div>
   );

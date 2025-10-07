@@ -35,9 +35,13 @@ interface ChatMessage {
   language?: string;
 }
 
+interface JarvisAssistantProps {
+  onActiveChange?: (isActive: boolean) => void;
+}
+
 const WAKE_PHRASES = ['hey bro', 'hai bro', 'हे ब्रो', 'हाय ब्रो'];
 
-export const JarvisAssistant = () => {
+export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
   const [isActive, setIsActive] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     // Load messages from localStorage on mount
@@ -383,6 +387,24 @@ export const JarvisAssistant = () => {
   const handleToggleListening = () => {
     console.log('🎯 Toggle Listening clicked');
     console.log('Current state - isListening:', isListening, 'isActive:', isActive);
+    
+    if (isActive) {
+      stopListening();
+      stopSpeaking();
+      setIsActive(false);
+      onActiveChange?.(false);
+      const farewell = 'Goodbye! See you soon.';
+      const aiMessage: ChatMessage = {
+        id: Date.now().toString(),
+        text: farewell,
+        isUser: false,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, aiMessage]);
+      speak(farewell);
+      console.log('🛑 Assistant stopped');
+      return;
+    }
     
     if (!speechSupported && !isMobile) {
       console.log('❌ Speech not supported on this browser');
