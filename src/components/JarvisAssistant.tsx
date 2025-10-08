@@ -43,6 +43,8 @@ const WAKE_PHRASES = ['hey bro', 'hai bro', 'हे ब्रो', 'हाय �
 
 export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
   const [isActive, setIsActive] = useState(false);
+  const [hasGreeted, setHasGreeted] = useState(false);
+  const [detectedLanguage, setDetectedLanguage] = useState<'english' | 'hindi' | 'hinglish'>('english');
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     // Load messages from localStorage on mount
     const saved = localStorage.getItem('jarvis-messages');
@@ -90,12 +92,31 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     PlanService.getUserTier().then(setUserTier);
   }, []);
 
+  // Language detection helper
+  const detectLanguage = (text: string): 'english' | 'hindi' | 'hinglish' => {
+    const hindiPattern = /[\u0900-\u097F]/;
+    const hasHindi = hindiPattern.test(text);
+    const hasEnglish = /[a-zA-Z]/.test(text);
+    
+    if (hasHindi && hasEnglish) return 'hinglish';
+    if (hasHindi) return 'hindi';
+    return 'english';
+  };
+
   const handleSpeechResult = useCallback((result: any) => {
     console.log('🎤 Speech result received:', result);
     if (result.isFinal) {
       const transcript = result.transcript.toLowerCase().trim();
       console.log('📝 Processing transcript:', transcript);
       console.log('🤖 Is Active:', isActive);
+      
+      // Auto-detect language from first user input
+      if (!hasGreeted && transcript) {
+        const detected = detectLanguage(transcript);
+        setDetectedLanguage(detected);
+        localStorage.setItem('jarvis-language', detected);
+        console.log('🌐 Language detected:', detected);
+      }
       
       // Always process commands when transcript is received and listening
       if (transcript) {
@@ -113,7 +134,7 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
         processCommand(transcript);
       }
     }
-  }, [isActive]);
+  }, [isActive, hasGreeted]);
 
   const { isListening, startListening, stopListening, isSupported: speechSupported } = useSpeechRecognition(
     handleSpeechResult,
@@ -447,23 +468,35 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
           .then(() => {
             startListening();
             setIsActive(true);
+            onActiveChange?.(true);
             
-            const greeting = Math.random() > 0.5
-              ? 'Hey there! I\'m online and ready to help, bro.'
-              : 'JARVIS activated. How can I assist you today?';
-            
-            const voiceEnabled = localStorage.getItem('jarvis-voice-enabled') !== 'false';
-            if (voiceEnabled) {
-              speak(greeting);
+            // Greet only once per session
+            if (!hasGreeted) {
+              const storedLang = localStorage.getItem('jarvis-language') as 'english' | 'hindi' | 'hinglish' || 'english';
+              setDetectedLanguage(storedLang);
+              
+              const greetings = {
+                english: 'Hey there! I\'m online and ready to help, bro.',
+                hindi: 'नमस्ते! मैं ऑनलाइन हूँ और मदद के लिए तैयार हूँ।',
+                hinglish: 'Hey bro! Main online hun aur ready hun help karne ke liye.'
+              };
+              
+              const greeting = greetings[storedLang];
+              
+              const voiceEnabled = localStorage.getItem('jarvis-voice-enabled') !== 'false';
+              if (voiceEnabled) {
+                speak(greeting, { lang: storedLang === 'hindi' ? 'hi-IN' : 'en-US' });
+              }
+              
+              const aiMessage: ChatMessage = {
+                id: Date.now().toString(),
+                text: greeting,
+                isUser: false,
+                timestamp: new Date()
+              };
+              setMessages(prev => [...prev, aiMessage]);
+              setHasGreeted(true);
             }
-            
-            const aiMessage: ChatMessage = {
-              id: Date.now().toString(),
-              text: greeting,
-              isUser: false,
-              timestamp: new Date()
-            };
-            setMessages(prev => [...prev, aiMessage]);
             
             toast({
               title: 'JARVIS Started',
@@ -481,6 +514,7 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
       } else {
         startListening();
         setIsActive(true);
+        onActiveChange?.(true);
       }
     }
   };

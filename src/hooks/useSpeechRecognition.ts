@@ -129,12 +129,20 @@ export const useSpeechRecognition = (
       setTranscript(fullTranscript);
 
       if (onResult && fullTranscript.trim()) {
-        console.log('Calling onResult with:', fullTranscript);
-        onResult({
-          transcript: fullTranscript,
-          confidence: event.results[event.results.length - 1]?.[0]?.confidence || 0,
-          isFinal: event.results[event.results.length - 1]?.isFinal || false
-        });
+        const confidence = event.results[event.results.length - 1]?.[0]?.confidence || 0;
+        const isFinal = event.results[event.results.length - 1]?.isFinal || false;
+        
+        // Only process results with confidence above 0.5 or interim results
+        if (!isFinal || confidence >= 0.5) {
+          console.log('Calling onResult with:', fullTranscript, 'confidence:', confidence);
+          onResult({
+            transcript: fullTranscript,
+            confidence,
+            isFinal
+          });
+        } else {
+          console.log('Skipping low confidence result:', confidence);
+        }
       }
     };
 

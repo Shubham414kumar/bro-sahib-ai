@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 
 interface UseTextToSpeechReturn {
-  speak: (text: string, options?: SpeechSynthesisUtterance) => void;
+  speak: (text: string, options?: Partial<SpeechSynthesisUtterance> & { lang?: string }) => void;
   isSpeaking: boolean;
   isSupported: boolean;
   voices: SpeechSynthesisVoice[];
@@ -36,7 +36,7 @@ export const useTextToSpeech = (): UseTextToSpeechReturn => {
     }
   }, [isSupported, updateVoices]);
 
-  const speak = useCallback((text: string, options?: Partial<SpeechSynthesisUtterance>) => {
+  const speak = useCallback((text: string, options?: Partial<SpeechSynthesisUtterance> & { lang?: string }) => {
     if (!isSupported) {
       console.warn('Text-to-speech is not supported in this browser');
       return;
@@ -47,23 +47,38 @@ export const useTextToSpeech = (): UseTextToSpeechReturn => {
 
     const utterance = new SpeechSynthesisUtterance(text);
     
-    // Set default options
+    // Enhanced voice settings for natural, lively tone
     utterance.rate = options?.rate || 1;
-    utterance.pitch = options?.pitch || 1;
+    utterance.pitch = options?.pitch || 1.2; // Slightly higher pitch for energetic feel
     utterance.volume = options?.volume || 1;
     utterance.lang = options?.lang || 'en-US';
 
-    // Find appropriate voice
+    // Find appropriate voice based on language
     if (options?.voice) {
       utterance.voice = options.voice;
     } else {
-      // Try to find a good English voice
-      const englishVoice = voices.find(voice => 
-        voice.lang.startsWith('en') && voice.name.includes('Google')
-      ) || voices.find(voice => voice.lang.startsWith('en'));
+      let selectedVoice: SpeechSynthesisVoice | undefined;
       
-      if (englishVoice) {
-        utterance.voice = englishVoice;
+      if (options?.lang === 'hi-IN') {
+        // For Hindi: Google हिन्दी
+        selectedVoice = voices.find(voice => 
+          voice.lang === 'hi-IN' && voice.name.includes('Google')
+        ) || voices.find(voice => voice.lang === 'hi-IN');
+      } else {
+        // For English: Natural, energetic, young-sounding female voice
+        selectedVoice = voices.find(voice => 
+          voice.lang.startsWith('en') && 
+          (voice.name.includes('Google UK English Female') || 
+           voice.name.includes('Female') ||
+           voice.name.includes('Samantha'))
+        ) || voices.find(voice => 
+          voice.lang.startsWith('en') && voice.name.includes('Google')
+        ) || voices.find(voice => voice.lang.startsWith('en'));
+      }
+      
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+        console.log('🎤 Selected voice:', selectedVoice.name, selectedVoice.lang);
       }
     }
 
