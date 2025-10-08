@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      chat_history: {
+        Row: {
+          created_at: string
+          id: number
+          message_text: string | null
+          sender: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          message_text?: string | null
+          sender?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          message_text?: string | null
+          sender?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           amount: number
@@ -54,15 +78,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "orders_plan_id_fkey"
-            columns: ["plan_id"]
-            isOneToOne: false
-            referencedRelation: "plans"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       pass_redemption_attempts: {
         Row: {
@@ -93,36 +109,27 @@ export type Database = {
       }
       plans: {
         Row: {
-          created_at: string | null
           currency: string | null
           description: string | null
-          features: string[] | null
-          id: string
-          name: string
-          price: number
-          tier: string
+          features: string | null
+          name: string | null
+          price: number | null
           type: string
         }
         Insert: {
-          created_at?: string | null
           currency?: string | null
           description?: string | null
-          features?: string[] | null
-          id?: string
-          name: string
-          price: number
-          tier: string
+          features?: string | null
+          name?: string | null
+          price?: number | null
           type: string
         }
         Update: {
-          created_at?: string | null
           currency?: string | null
           description?: string | null
-          features?: string[] | null
-          id?: string
-          name?: string
-          price?: number
-          tier?: string
+          features?: string | null
+          name?: string | null
+          price?: number | null
           type?: string
         }
         Relationships: []
@@ -241,35 +248,37 @@ export type Database = {
         }
         Relationships: []
       }
-      subscriptions: {
+      subscription: {
         Row: {
-          created_at: string | null
-          end_date: string | null
-          id: string
-          start_date: string | null
-          status: string
-          tier: string
-          user_id: string
+          created_at: string
+          id: number
+          plan_type: string | null
+          status: string | null
+          user_id: string | null
         }
         Insert: {
-          created_at?: string | null
-          end_date?: string | null
-          id?: string
-          start_date?: string | null
-          status: string
-          tier: string
-          user_id: string
+          created_at?: string
+          id?: number
+          plan_type?: string | null
+          status?: string | null
+          user_id?: string | null
         }
         Update: {
-          created_at?: string | null
-          end_date?: string | null
-          id?: string
-          start_date?: string | null
-          status?: string
-          tier?: string
-          user_id?: string
+          created_at?: string
+          id?: number
+          plan_type?: string | null
+          status?: string | null
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "subscription_plan_type_fkey"
+            columns: ["plan_type"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["type"]
+          },
+        ]
       }
       user_purchases: {
         Row: {
@@ -305,15 +314,7 @@ export type Database = {
           tier?: string
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "user_purchases_plan_id_fkey"
-            columns: ["plan_id"]
-            isOneToOne: false
-            referencedRelation: "plans"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
