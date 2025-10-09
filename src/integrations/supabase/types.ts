@@ -112,6 +112,7 @@ export type Database = {
           currency: string | null
           description: string | null
           features: string | null
+          id: string
           name: string | null
           price: number | null
           type: string
@@ -120,6 +121,7 @@ export type Database = {
           currency?: string | null
           description?: string | null
           features?: string | null
+          id?: string
           name?: string | null
           price?: number | null
           type: string
@@ -128,6 +130,7 @@ export type Database = {
           currency?: string | null
           description?: string | null
           features?: string | null
+          id?: string
           name?: string | null
           price?: number | null
           type?: string
@@ -270,15 +273,7 @@ export type Database = {
           status?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "subscription_plan_type_fkey"
-            columns: ["plan_type"]
-            isOneToOne: false
-            referencedRelation: "plans"
-            referencedColumns: ["type"]
-          },
-        ]
+        Relationships: []
       }
       user_purchases: {
         Row: {
