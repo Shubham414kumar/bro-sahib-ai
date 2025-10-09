@@ -21,7 +21,6 @@ interface Plan {
   currency: string;
   type: string;
   features: string[];
-  tier: string;
 }
 
 export const PaymentPlans = () => {
@@ -44,7 +43,16 @@ export const PaymentPlans = () => {
         .order('price', { ascending: true });
 
       if (error) throw error;
-      setPlans(data || []);
+      
+      // Parse features from JSON string to array
+      const parsedPlans = (data || []).map(plan => ({
+        ...plan,
+        features: typeof plan.features === 'string' 
+          ? JSON.parse(plan.features) 
+          : plan.features
+      }));
+      
+      setPlans(parsedPlans);
     } catch (error) {
       console.error('Error fetching plans:', error);
       toast({
@@ -192,10 +200,10 @@ export const PaymentPlans = () => {
             key={plan.id} 
             className={cn(
               "relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105",
-              plan.tier === 'premium' && "border-2 border-primary"
+              plan.type === 'premium' && "border-2 border-primary"
             )}
           >
-            {plan.tier === 'premium' && (
+            {plan.type === 'premium' && (
               <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1 text-xs font-bold rounded-bl-lg">
                 BEST VALUE
               </div>
@@ -203,9 +211,9 @@ export const PaymentPlans = () => {
             <CardHeader>
               <div className={cn(
                 "w-12 h-12 rounded-lg bg-gradient-to-br flex items-center justify-center text-white mb-4",
-                getTierColor(plan.tier)
+                getTierColor(plan.type)
               )}>
-                {getIconForTier(plan.tier)}
+                {getIconForTier(plan.type)}
               </div>
               <CardTitle className="text-lg sm:text-xl">{plan.name}</CardTitle>
               <CardDescription className="text-xs sm:text-sm">{plan.description}</CardDescription>
@@ -226,7 +234,7 @@ export const PaymentPlans = () => {
               <Button
                 className={cn(
                   "w-full text-sm sm:text-base",
-                  plan.tier === 'premium' && "bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
+                  plan.type === 'premium' && "bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
                 )}
                 size="lg"
                 onClick={() => handlePayment(plan)}
