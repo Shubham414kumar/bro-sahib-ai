@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Check, Loader2, Crown, Zap, Star } from 'lucide-react';
+import { Check, Loader2, Crown, Zap, Star, CreditCard } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 declare global {
   interface Window {
@@ -28,6 +29,7 @@ export const PaymentPlans = () => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'phonepe'>('phonepe');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -72,18 +74,7 @@ export const PaymentPlans = () => {
     document.body.appendChild(script);
   };
 
-  const handlePayment = async (plan: Plan) => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please login to make a payment",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setProcessingPlanId(plan.id);
-
+  const handleRazorpayPayment = async (plan: Plan) => {
     try {
       // Create Razorpay order
       const { data, error } = await supabase.functions.invoke('create-razorpay-order', {
@@ -140,12 +131,58 @@ export const PaymentPlans = () => {
       });
 
     } catch (error: any) {
-      console.error('Payment error:', error);
+      console.error('Razorpay payment error:', error);
       toast({
         title: "Payment Error",
         description: error.message || "Failed to initiate payment",
         variant: "destructive",
       });
+    }
+  };
+
+  const handlePhonePePayment = async (plan: Plan) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('create-phonepe-order', {
+        body: { planId: plan.id }
+      });
+
+      if (error) throw error;
+
+      // Redirect to PhonePe payment page
+      if (data?.data?.instrumentResponse?.redirectInfo?.url) {
+        window.location.href = data.data.instrumentResponse.redirectInfo.url;
+      } else {
+        throw new Error('PhonePe payment URL not received');
+      }
+
+    } catch (error: any) {
+      console.error('PhonePe payment error:', error);
+      toast({
+        title: "Payment Error",
+        description: error.message || "Failed to initiate PhonePe payment",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePayment = async (plan: Plan) => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please login to make a payment",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setProcessingPlanId(plan.id);
+
+    try {
+      if (paymentMethod === 'razorpay') {
+        await handleRazorpayPayment(plan);
+      } else {
+        await handlePhonePePayment(plan);
+      }
     } finally {
       setProcessingPlanId(null);
     }
@@ -192,6 +229,20 @@ export const PaymentPlans = () => {
         <p className="text-sm sm:text-base text-muted-foreground">
           Unlock powerful features for your Jarvis Assistant
         </p>
+        
+        {/* Payment Method Selector */}
+        <div className="flex items-center justify-center gap-3 mt-6">
+          <CreditCard className="h-5 w-5 text-muted-foreground" />
+          <Select value={paymentMethod} onValueChange={(value: 'razorpay' | 'phonepe') => setPaymentMethod(value)}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Select payment method" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="phonepe">PhonePe</SelectItem>
+              <SelectItem value="razorpay">Razorpay</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
