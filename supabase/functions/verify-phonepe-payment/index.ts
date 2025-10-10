@@ -33,8 +33,8 @@ serve(async (req) => {
       throw new Error("PhonePe credentials not configured");
     }
 
-    // Check payment status
-    const statusUrl = `https://api.phonepe.com/apis/hermes/pg/v1/status/${merchantId}/${txnId}`;
+    // Check payment status - Use UAT endpoint
+    const statusUrl = `https://api-preprod.phonepe.com/apis/pg-sandbox/pg/v1/status/${merchantId}/${txnId}`;
     const stringToHash = `/pg/v1/status/${merchantId}/${txnId}` + saltKey;
     const sha256Hash = createHmac("sha256", saltKey).update(stringToHash).digest("hex");
     const checksum = `${sha256Hash}###1`;

@@ -60,7 +60,7 @@ serve(async (req) => {
       merchantId: merchantId,
       merchantTransactionId: transactionId,
       merchantUserId: merchantUserId,
-      amount: plan.price, // Amount in paise
+      amount: plan.price * 100, // Amount in paise (multiply by 100)
       redirectUrl: `${Deno.env.get("SUPABASE_URL")}/functions/v1/verify-phonepe-payment`,
       redirectMode: "POST",
       callbackUrl: `${Deno.env.get("SUPABASE_URL")}/functions/v1/verify-phonepe-payment`,
@@ -77,7 +77,8 @@ serve(async (req) => {
 
     console.log("Creating PhonePe order:", transactionId);
 
-    const response = await fetch("https://api.phonepe.com/apis/hermes/pg/v1/pay", {
+    // Use UAT (test) endpoint for PhonePe
+    const response = await fetch("https://api-preprod.phonepe.com/apis/pg-sandbox/pg/v1/pay", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

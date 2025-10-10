@@ -18,7 +18,7 @@ class PlanService {
         return 'free';
       }
 
-      const { data: purchase } = await supabase
+      const { data: purchase, error } = await supabase
         .from('user_purchases')
         .select('tier, is_active')
         .eq('user_id', user.id)
@@ -26,6 +26,11 @@ class PlanService {
         .order('purchase_date', { ascending: false })
         .limit(1)
         .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching user tier:', error);
+        return 'free';
+      }
 
       if (purchase) {
         this.userTier = purchase.tier as UserTier;
