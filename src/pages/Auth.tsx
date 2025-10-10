@@ -6,7 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import { Chrome } from 'lucide-react';
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -57,6 +59,37 @@ export default function Auth() {
       navigate('/');
     }
     setLoading(false);
+  };
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/`
+      }
+    });
+
+    if (error) {
+      toast.error(error.message);
+      setLoading(false);
+    }
+  };
+
+  const handleMicrosoftSignIn = async () => {
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'azure',
+      options: {
+        redirectTo: `${window.location.origin}/`,
+        scopes: 'email'
+      }
+    });
+
+    if (error) {
+      toast.error(error.message);
+      setLoading(false);
+    }
   };
 
   return (
@@ -135,6 +168,40 @@ export default function Auth() {
               </form>
             </TabsContent>
           </Tabs>
+
+          <div className="relative my-6">
+            <Separator />
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-2 text-xs text-muted-foreground">
+              OR CONTINUE WITH
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+            >
+              <Chrome className="mr-2 h-4 w-4" />
+              Google
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleMicrosoftSignIn}
+              disabled={loading}
+            >
+              <svg className="mr-2 h-4 w-4" viewBox="0 0 23 23">
+                <path fill="#f3f3f3" d="M0 0h23v23H0z"/>
+                <path fill="#f35325" d="M1 1h10v10H1z"/>
+                <path fill="#81bc06" d="M12 1h10v10H12z"/>
+                <path fill="#05a6f0" d="M1 12h10v10H1z"/>
+                <path fill="#ffba08" d="M12 12h10v10H12z"/>
+              </svg>
+              Microsoft
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

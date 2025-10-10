@@ -67,15 +67,31 @@ export const PaymentPlans = () => {
     }
   };
 
-  const loadRazorpayScript = () => {
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    document.body.appendChild(script);
+  const loadRazorpayScript = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (window.Razorpay) {
+        resolve();
+        return;
+      }
+      
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Failed to load Razorpay script'));
+      document.body.appendChild(script);
+    });
   };
 
   const handleRazorpayPayment = async (plan: Plan) => {
     try {
+      // Ensure Razorpay script is loaded
+      await loadRazorpayScript();
+      
+      if (!window.Razorpay) {
+        throw new Error('Razorpay SDK failed to load');
+      }
+
       // Create Razorpay order
       const { data, error } = await supabase.functions.invoke('create-razorpay-order', {
         body: { planId: plan.id }
