@@ -65,12 +65,10 @@ export const useTextToSpeech = (): UseTextToSpeechReturn => {
           voice.lang === 'hi-IN' && voice.name.includes('Google')
         ) || voices.find(voice => voice.lang === 'hi-IN');
       } else {
-        // For English: Natural, energetic, young-sounding female voice
+        // Always prefer female voices with priority order
         selectedVoice = voices.find(voice => 
           voice.lang.startsWith('en') && 
-          (voice.name.includes('Google UK English Female') || 
-           voice.name.includes('Female') ||
-           voice.name.includes('Samantha'))
+          (voice.name.includes('Female') || voice.name.includes('Samantha') || voice.name.includes('Victoria'))
         ) || voices.find(voice => 
           voice.lang.startsWith('en') && voice.name.includes('Google')
         ) || voices.find(voice => voice.lang.startsWith('en'));

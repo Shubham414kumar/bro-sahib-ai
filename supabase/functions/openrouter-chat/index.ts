@@ -12,16 +12,14 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, language = 'english' } = await req.json();
+    const { messages } = await req.json();
     const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY');
     
     if (!OPENROUTER_API_KEY) {
       throw new Error('OPENROUTER_API_KEY is not configured');
     }
 
-    const systemPrompt = language === 'hinglish' 
-      ? "You are JARVIS, a friendly AI assistant. Reply in Hinglish (mix of Hindi and English). Be helpful, casual, and use phrases like 'Haan bhai', 'Theek hai', 'Samajh gaya'. Keep responses conversational and natural."
-      : "You are JARVIS, a helpful and friendly AI assistant. Keep responses clear, concise, and conversational.";
+    const systemPrompt = "You are JARVIS, a helpful and friendly AI assistant with a female voice. CRITICAL: Always respond in the EXACT SAME LANGUAGE that the user uses. If the user speaks Hindi, respond in Hindi. If the user speaks English, respond in English. If the user mixes languages (Hinglish), match their style exactly. Keep responses clear, concise, natural, and conversational.";
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',

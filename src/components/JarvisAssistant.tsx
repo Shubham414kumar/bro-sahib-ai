@@ -26,6 +26,7 @@ import { SecurityService } from '@/services/SecurityService';
 import PlanService, { UserTier } from '@/services/PlanService';
 import { Button } from './ui/button';
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Crown, UserCircle, Menu } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ChatMessage {
   id: string;
@@ -92,31 +93,12 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     PlanService.getUserTier().then(setUserTier);
   }, []);
 
-  // Language detection helper
-  const detectLanguage = (text: string): 'english' | 'hindi' | 'hinglish' => {
-    const hindiPattern = /[\u0900-\u097F]/;
-    const hasHindi = hindiPattern.test(text);
-    const hasEnglish = /[a-zA-Z]/.test(text);
-    
-    if (hasHindi && hasEnglish) return 'hinglish';
-    if (hasHindi) return 'hindi';
-    return 'english';
-  };
-
   const handleSpeechResult = useCallback((result: any) => {
     console.log('🎤 Speech result received:', result);
     if (result.isFinal) {
       const transcript = result.transcript.toLowerCase().trim();
       console.log('📝 Processing transcript:', transcript);
       console.log('🤖 Is Active:', isActive);
-      
-      // Auto-detect language from first user input
-      if (!hasGreeted && transcript) {
-        const detected = detectLanguage(transcript);
-        setDetectedLanguage(detected);
-        localStorage.setItem('jarvis-language', detected);
-        console.log('🌐 Language detected:', detected);
-      }
       
       // Always process commands when transcript is received and listening
       if (transcript) {
@@ -146,46 +128,37 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     let response = '';
     const lowerCommand = command.toLowerCase();
 
-    // Enhanced command processing with Hinglish support
-    if (lowerCommand.includes('time') || lowerCommand.includes('samay') || lowerCommand.includes('btao') || lowerCommand.includes('bata')) {
+    // Simple command processing - AI will handle language
+    if (lowerCommand.includes('time') || lowerCommand.includes('समय') || lowerCommand.includes('samay')) {
       const now = new Date();
-      const hinglishTime = Math.random() > 0.5 
-        ? `Abhi time hai ${now.toLocaleTimeString()}`
-        : `The current time is ${now.toLocaleTimeString()}`;
-      response = hinglishTime;
+      response = `Current time is ${now.toLocaleTimeString()}`;
     } 
-    else if (lowerCommand.includes('date') || lowerCommand.includes('tarikh') || lowerCommand.includes('din')) {
+    else if (lowerCommand.includes('date') || lowerCommand.includes('तारीख') || lowerCommand.includes('tarikh')) {
       const today = new Date();
-      const hinglishDate = Math.random() > 0.5 
-        ? `Aaj ka date hai ${today.toLocaleDateString()}`
-        : `Today is ${today.toLocaleDateString()}`;
-      response = hinglishDate;
+      response = `Today's date is ${today.toLocaleDateString()}`;
     }
     // Memory commands
-    else if (lowerCommand.includes('naam yaad rakho') || lowerCommand.includes('remember my name')) {
-      const nameMatch = command.match(/naam\s+(.+?)\s+yaad\s+rakho|my\s+name\s+is\s+(.+)/i);
+    else if (lowerCommand.includes('my name is') || lowerCommand.includes('naam')) {
+      const nameMatch = command.match(/my\s+name\s+is\s+(.+)|naam\s+(.+)/i);
       if (nameMatch) {
-        const name = nameMatch[1] || nameMatch[2];
+        const name = (nameMatch[1] || nameMatch[2]).trim();
         await MemoryService.saveMemory('user_name', name);
-        response = `Theek hai bro, main yaad rakh lunga ki aapka naam ${name} hai.`;
-      } else {
-        response = 'Bataiye aapka naam kya hai? Boliye "mera naam [your name] yaad rakho"';
+        response = `I'll remember your name is ${name}`;
       }
     }
-    else if (lowerCommand.includes('mera naam kya hai') || lowerCommand.includes('what is my name')) {
+    else if (lowerCommand.includes('what is my name') || lowerCommand.includes('mera naam')) {
       const name = await MemoryService.getMemory('user_name');
       response = name 
-        ? `Aapka naam ${name} hai, yaad hai mujhe!`
-        : 'Sorry bro, mujhe aapka naam yaad nahi hai. Pehle bataiye "mera naam [your name] yaad rakho"';
+        ? `Your name is ${name}`
+        : 'I don\'t have your name saved yet';
     }
     // Web search
-    else if (lowerCommand.includes('search') || lowerCommand.includes('google') || lowerCommand.includes('khojo')) {
-      const searchMatch = command.match(/search\s+(.+)|google\s+(.+)|khojo\s+(.+)/i);
+    else if (lowerCommand.includes('search') || lowerCommand.includes('google') || lowerCommand.includes('खोज')) {
+      const searchMatch = command.match(/search\s+(.+)|google\s+(.+)|खोज\s+(.+)/i);
       if (searchMatch) {
         const query = searchMatch[1] || searchMatch[2] || searchMatch[3];
-        response = 'Searching kar raha hun... wait karo';
+        response = 'Searching...';
         
-        // Add immediate response
         const searchingMessage: ChatMessage = {
           id: Date.now().toString(),
           text: response,
@@ -197,28 +170,20 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
         if (!isMuted) speak(response);
         
         try {
-          // Perform search
           const searchResult = await SearchService.searchWeb(query);
           response = `Search result: ${searchResult}`;
         } catch (error) {
           console.error('Search error:', error);
-          response = `Sorry bro, search mein problem aa rahi hai. Try karo: "time batao" ya "mera naam kya hai"`;
+          response = `Search failed. Please try again.`;
         }
-      } else {
-        response = 'Kya search karna hai? Boliye "search [your query]"';
       }
     }
-    // Advanced System commands with tier checking and auto-execution
-    else if (lowerCommand.includes('open') || lowerCommand.includes('kholo') || 
+    // Advanced System commands with tier checking
+    else if (lowerCommand.includes('open') || lowerCommand.includes('खोल') || 
              lowerCommand.includes('play') || lowerCommand.includes('youtube') ||
              lowerCommand.includes('calculate') || lowerCommand.includes('whatsapp') ||
-             lowerCommand.includes('map') || lowerCommand.includes('navigate') ||
-             lowerCommand.includes('email') || lowerCommand.includes('gmail') ||
-             lowerCommand.includes('amazon') || lowerCommand.includes('weather') ||
-             lowerCommand.includes('news') || lowerCommand.includes('battery') ||
-             lowerCommand.includes('network') || lowerCommand.includes('timer') ||
-             lowerCommand.includes('translate') || lowerCommand.includes('screenshot') ||
-             lowerCommand.includes('call') || lowerCommand.includes('phone')) {
+             lowerCommand.includes('map') || lowerCommand.includes('email') ||
+             lowerCommand.includes('gmail') || lowerCommand.includes('weather')) {
       
       // Check feature availability based on user tier
       const commandFeatureMap: Record<string, string> = {
@@ -250,138 +215,37 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
 
       // Check if user has access to this feature
       if (requiredFeature && !PlanService.isFeatureAvailable(requiredFeature)) {
-        response = userTier === 'free' 
-          ? "Ye feature premium hai bro. Crown icon pe click karke plan choose karo."
-          : "Is feature ke liye aapko upgrade karna padega. Crown icon pe click karo.";
+        response = "This feature requires premium membership. Click the crown icon to upgrade.";
         setShowPremiumGate(true);
       } else {
-        // Auto-execute the command
         response = AdvancedSystemService.executeCommand(command);
-        
-        // Special handling for YouTube music playback
-        if (lowerCommand.includes('play') && (lowerCommand.includes('music') || lowerCommand.includes('song') || lowerCommand.includes('gaana'))) {
-          const songMatch = command.match(/play\s+(.+?)(?:\s+music|\s+song|\s+gaana|$)/i);
-          if (songMatch) {
-            const songName = songMatch[1].replace(/music|song|gaana/gi, '').trim();
-            window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(songName + ' song')}`, '_blank');
-            response = `YouTube pe "${songName}" play kar raha hun... Pehla result automatically play hoga.`;
-          }
-        }
-        
-        // Special handling for calculator with direct calculation
-        if (lowerCommand.includes('calculate') || lowerCommand.includes('add') || lowerCommand.includes('subtract') || lowerCommand.includes('multiply') || lowerCommand.includes('divide')) {
-          const calcMatch = command.match(/(\d+(?:\.\d+)?)\s*([+\-*/]|\s+(?:plus|add|minus|subtract|multiply|divide|times))\s*(\d+(?:\.\d+)?)/gi);
-          if (calcMatch) {
-            try {
-              // Extract numbers and operation
-              const expression = command.replace(/plus|add/gi, '+')
-                                     .replace(/minus|subtract/gi, '-')
-                                     .replace(/multiply|times/gi, '*')
-                                     .replace(/divide|by/gi, '/')
-                                     .match(/[\d+\-*/.\s]+/);
-              if (expression) {
-                const result = Function('"use strict"; return (' + expression[0].replace(/[^0-9+\-*/().\s]/g, '') + ')')();
-                response = `Calculation ka result hai: ${result}`;
-              }
-            } catch (error) {
-              response = 'Calculation mein error aaya. Try again with proper numbers.';
-            }
-          }
-        }
-        
-        // Auto-handle call features for premium users
-        if ((lowerCommand.includes('call') || lowerCommand.includes('phone')) && userTier === 'premium') {
-          const numberMatch = command.match(/(\d{10})/);
-          if (numberMatch) {
-            window.open(`tel:${numberMatch[1]}`, '_blank');
-            response = `Calling ${numberMatch[1]}... Phone app open ho raha hai.`;
-          } else {
-            response = 'Phone number batao call karne ke liye. Example: "call 9876543210"';
-          }
-        }
       }
     }
     // Reminders
-    else if (lowerCommand.includes('remind me') || lowerCommand.includes('yaad dilana')) {
-      const reminderMatch = command.match(/remind\s+me\s+(.+?)\s+in\s+(\d+)\s+minute|yaad\s+dilana\s+(.+?)\s+(\d+)\s+minute/i);
+    else if (lowerCommand.includes('remind')) {
+      const reminderMatch = command.match(/remind\s+me\s+(.+?)\s+in\s+(\d+)\s+minute/i);
       if (reminderMatch) {
-        const text = reminderMatch[1] || reminderMatch[3];
-        const minutes = parseInt(reminderMatch[2] || reminderMatch[4]);
+        const text = reminderMatch[1];
+        const minutes = parseInt(reminderMatch[2]);
         response = await ReminderService.setReminder(text, minutes);
-      } else {
-        response = 'Reminder kaise set karu? Boliye "remind me [task] in [number] minutes"';
       }
     }
-    // Feature activation with Hinglish
-    else if (lowerCommand.includes('email')) {
-      response = Math.random() > 0.5 
-        ? 'Email feature activate ho gaya hai. Main aapke emails read aur compose kar sakta hun.'
-        : 'Email feature activated. I can help you read and compose emails.';
-      if (!activeFeatures.includes('email')) {
-        setActiveFeatures(prev => [...prev, 'email']);
-      }
-    }
-    else if (lowerCommand.includes('youtube') || lowerCommand.includes('music') || lowerCommand.includes('gaana')) {
-      response = Math.random() > 0.5 
-        ? 'YouTube aur music control active hai. Gaane play kar sakta hun.'
-        : 'YouTube and music control is now active. You can ask me to play songs.';
-      if (!activeFeatures.includes('youtube')) {
-        setActiveFeatures(prev => [...prev, 'youtube']);
-      }
-    }
-    else if (lowerCommand.includes('screen') || lowerCommand.includes('automation')) {
-      response = 'Screen automation feature ready hai. Screen tasks automate kar sakta hun.';
-      if (!activeFeatures.includes('screen')) {
-        setActiveFeatures(prev => [...prev, 'screen']);
-      }
-    }
-    else if (lowerCommand.includes('study') || lowerCommand.includes('padhai')) {
-      response = Math.random() > 0.5 
-        ? 'Study helper mode activate! Padhai mein help kar sakta hun.'
-        : 'Study helper mode activated. I can assist with learning and research.';
-      if (!activeFeatures.includes('study')) {
-        setActiveFeatures(prev => [...prev, 'study']);
-      }
-    }
-    else if (lowerCommand.includes('face') || lowerCommand.includes('recognition')) {
-      response = 'Face recognition system ready hai. Camera access chahiye hoga.';
-      if (!activeFeatures.includes('face')) {
-        setActiveFeatures(prev => [...prev, 'face']);
-      }
-    }
-    else if (lowerCommand.includes('app') || lowerCommand.includes('application')) {
-      response = Math.random() > 0.5 
-        ? 'App control activate ho gaya. Applications manage kar sakta hun.'
-        : 'App control is now active. I can help manage applications.';
-      if (!activeFeatures.includes('apps')) {
-        setActiveFeatures(prev => [...prev, 'apps']);
-      }
-    }
-    else if (lowerCommand.includes('goodbye') || lowerCommand.includes('bye') || lowerCommand.includes('sleep') || lowerCommand.includes('alvida')) {
-      response = Math.random() > 0.5 
-        ? 'Theek hai bro, main sleep mode mein ja raha hun. "Hey Bro" bolke wapas jagana.'
-        : 'JARVIS going to sleep mode. Say "Hey Bro" to wake me up again.';
-      setIsActive(false);
-    }
-    else if (lowerCommand.includes('mute') || lowerCommand.includes('chup')) {
-      setIsMuted(true);
-      response = 'Audio mute kar diya hai.';
-    }
-    else if (lowerCommand.includes('unmute') || lowerCommand.includes('bol')) {
-      setIsMuted(false);
-      response = 'Audio restore ho gaya hai.';
-    }
+    // Use AI for all other commands - AI will respond in same language as user
     else {
-      // Enhanced default response with Hinglish - for ANY command that doesn't match
-      console.log('No specific command matched, giving default response');
-      const hinglishResponses = [
-        `"${command}" - ye samjha nahi bro. Main ye kar sakta hun: time, date, search, reminders, email, YouTube control. Kya chahiye?`,
-        `Mai sun raha hun "${command}". Kuch aur batao - search, time, date, ya koi specific task?`,
-        `"${command}" ka matlab samjha nahi. Try karo: "time batao", "search weather", "remind me in 5 minutes"`,
-        `Hello bro! "${command}" samjha nahi. Time, date, search, reminders - ye sab kar sakta hun. Kya chahiye?`,
-        `Bro, "${command}" clear nahi hai. Main active hun - time batao, search karo, ya reminder set karo!`
-      ];
-      response = hinglishResponses[Math.floor(Math.random() * hinglishResponses.length)];
+      console.log('No specific command matched, using AI');
+      try {
+        const { data, error } = await supabase.functions.invoke('openrouter-chat', {
+          body: { 
+            messages: [{ role: 'user', content: command }]
+          }
+        });
+
+        if (error) throw error;
+        response = data.message || 'I did not understand that command.';
+      } catch (error) {
+        console.error('AI response error:', error);
+        response = 'Sorry, I could not process that. Please try again.';
+      }
     }
 
     console.log('Generated response:', response);
