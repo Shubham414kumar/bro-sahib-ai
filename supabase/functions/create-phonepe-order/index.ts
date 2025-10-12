@@ -60,22 +60,23 @@ serve(async (req) => {
       merchantId: merchantId,
       merchantTransactionId: transactionId,
       merchantUserId: merchantUserId,
-      amount: plan.price * 100, // Amount in paise (multiply by 100)
-      redirectUrl: `${Deno.env.get("SUPABASE_URL")}/functions/v1/verify-phonepe-payment`,
-      redirectMode: "POST",
+      amount: plan.price, // Already in paise
+      redirectUrl: `${req.headers.get('origin') || 'https://lovable.dev'}/payment?status=redirect&txn=${transactionId}`,
+      redirectMode: "REDIRECT",
       callbackUrl: `${Deno.env.get("SUPABASE_URL")}/functions/v1/verify-phonepe-payment`,
-      mobileNumber: user.phone || "",
       paymentInstrument: {
         type: "PAY_PAGE"
       }
     };
+
+    console.log("Creating PhonePe order with payload:", JSON.stringify(paymentPayload, null, 2));
 
     const base64Payload = btoa(JSON.stringify(paymentPayload));
     const stringToHash = base64Payload + "/pg/v1/pay" + saltKey;
     const sha256Hash = createHmac("sha256", saltKey).update(stringToHash).digest("hex");
     const checksum = `${sha256Hash}###1`;
 
-    console.log("Creating PhonePe order:", transactionId);
+    console.log("PhonePe checksum:", checksum);
 
     // Use UAT (test) endpoint for PhonePe
     const response = await fetch("https://api-preprod.phonepe.com/apis/pg-sandbox/pg/v1/pay", {
@@ -83,18 +84,21 @@ serve(async (req) => {
       headers: {
         "Content-Type": "application/json",
         "X-VERIFY": checksum,
+        "accept": "application/json"
       },
       body: JSON.stringify({ request: base64Payload }),
     });
 
+    console.log("PhonePe response status:", response.status);
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error("PhonePe API error:", errorText);
-      throw new Error(`PhonePe API error: ${response.status}`);
+      throw new Error(`PhonePe API error: ${response.status} - ${errorText}`);
     }
 
     const phonePeResponse = await response.json();
-    console.log("PhonePe order created:", transactionId);
+    console.log("PhonePe response:", JSON.stringify(phonePeResponse, null, 2));
 
     // Save order to database
     const supabaseService = createClient(

@@ -158,24 +158,33 @@ export const PaymentPlans = () => {
 
   const handlePhonePePayment = async (plan: Plan) => {
     try {
+      console.log('Initiating PhonePe payment for plan:', plan.id);
+      
       const { data, error } = await supabase.functions.invoke('create-phonepe-order', {
         body: { planId: plan.id }
       });
 
-      if (error) throw error;
+      console.log('PhonePe order response:', data);
+
+      if (error) {
+        console.error('PhonePe function error:', error);
+        throw error;
+      }
 
       // Redirect to PhonePe payment page
       if (data?.data?.instrumentResponse?.redirectInfo?.url) {
+        console.log('Redirecting to PhonePe:', data.data.instrumentResponse.redirectInfo.url);
         window.location.href = data.data.instrumentResponse.redirectInfo.url;
       } else {
-        throw new Error('PhonePe payment URL not received');
+        console.error('Invalid PhonePe response:', data);
+        throw new Error('No payment URL received from PhonePe');
       }
 
     } catch (error: any) {
       console.error('PhonePe payment error:', error);
       toast({
-        title: "Payment Error",
-        description: error.message || "Failed to initiate PhonePe payment",
+        title: "Payment Failed",
+        description: error.message || "Failed to initiate payment. Please try again.",
         variant: "destructive",
       });
     }

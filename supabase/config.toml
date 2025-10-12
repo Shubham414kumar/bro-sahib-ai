@@ -24,6 +24,12 @@ verify_jwt = true
 [functions.verify-razorpay-payment]
 verify_jwt = true
 
+[functions.create-phonepe-order]
+verify_jwt = true
+
+[functions.verify-phonepe-payment]
+verify_jwt = false
+
 [functions.deepseek-search]
 verify_jwt = true
 

@@ -13,18 +13,25 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Verify payment request received");
+    
     const supabaseService = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
     );
 
-    const { merchantTransactionId, transactionId } = await req.json();
+    const requestBody = await req.json();
+    console.log("Request body:", JSON.stringify(requestBody, null, 2));
+    
+    const { merchantTransactionId, transactionId } = requestBody;
     const txnId = merchantTransactionId || transactionId;
 
     if (!txnId) {
       throw new Error("Transaction ID is required");
     }
+
+    console.log("Processing transaction:", txnId);
 
     const merchantId = Deno.env.get("PHONEPE_MERCHANT_ID");
     const saltKey = Deno.env.get("PHONEPE_SALT_KEY");
@@ -39,23 +46,29 @@ serve(async (req) => {
     const sha256Hash = createHmac("sha256", saltKey).update(stringToHash).digest("hex");
     const checksum = `${sha256Hash}###1`;
 
+    console.log("Checking payment status at:", statusUrl);
+    console.log("Checksum:", checksum);
+
     const response = await fetch(statusUrl, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
         "X-VERIFY": checksum,
         "X-MERCHANT-ID": merchantId,
+        "accept": "application/json"
       },
     });
+
+    console.log("PhonePe status response status:", response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error("PhonePe status check error:", errorText);
-      throw new Error(`PhonePe status check failed: ${response.status}`);
+      throw new Error(`PhonePe status check failed: ${response.status} - ${errorText}`);
     }
 
     const statusResponse = await response.json();
-    console.log("Payment status:", statusResponse);
+    console.log("Payment status response:", JSON.stringify(statusResponse, null, 2));
 
     if (statusResponse.success && statusResponse.code === "PAYMENT_SUCCESS") {
       // Update order status
