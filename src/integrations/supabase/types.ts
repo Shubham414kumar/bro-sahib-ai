@@ -38,6 +38,57 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_automations: {
+        Row: {
+          action_data: Json
+          action_type: string
+          created_at: string
+          id: string
+          interval_minutes: number | null
+          is_active: boolean
+          last_run: string | null
+          name: string
+          next_run: string | null
+          reminder_datetime: string | null
+          schedule_time: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action_data?: Json
+          action_type: string
+          created_at?: string
+          id?: string
+          interval_minutes?: number | null
+          is_active?: boolean
+          last_run?: string | null
+          name: string
+          next_run?: string | null
+          reminder_datetime?: string | null
+          schedule_time?: string | null
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action_data?: Json
+          action_type?: string
+          created_at?: string
+          id?: string
+          interval_minutes?: number | null
+          is_active?: boolean
+          last_run?: string | null
+          name?: string
+          next_run?: string | null
+          reminder_datetime?: string | null
+          schedule_time?: string | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           amount: number
@@ -85,7 +136,7 @@ export type Database = {
           attempt_time: string | null
           attempted_code: string | null
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           success: boolean | null
           user_id: string | null
         }
@@ -93,7 +144,7 @@ export type Database = {
           attempt_time?: string | null
           attempted_code?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           success?: boolean | null
           user_id?: string | null
         }
@@ -101,7 +152,7 @@ export type Database = {
           attempt_time?: string | null
           attempted_code?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           success?: boolean | null
           user_id?: string | null
         }
@@ -227,7 +278,7 @@ export type Database = {
           event_details: Json | null
           event_type: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           user_agent: string | null
           user_id: string | null
         }
@@ -236,7 +287,7 @@ export type Database = {
           event_details?: Json | null
           event_type: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           user_agent?: string | null
           user_id?: string | null
         }
@@ -245,7 +296,7 @@ export type Database = {
           event_details?: Json | null
           event_type?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           user_agent?: string | null
           user_id?: string | null
         }
@@ -316,22 +367,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      cleanup_old_pass_attempts: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      cleanup_old_pass_attempts: { Args: never; Returns: undefined }
       redeem_pass_and_subscribe: {
         Args: { pass_code_to_redeem: string; user_id_to_update: string }
         Returns: Json
       }
-      redeem_premium_pass: {
-        Args: { pass_code: string }
-        Returns: Json
-      }
-      validate_premium_pass: {
-        Args: { pass_code: string }
-        Returns: boolean
-      }
+      redeem_premium_pass: { Args: { pass_code: string }; Returns: Json }
+      validate_premium_pass: { Args: { pass_code: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

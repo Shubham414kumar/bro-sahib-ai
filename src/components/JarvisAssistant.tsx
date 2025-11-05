@@ -10,6 +10,7 @@ import { PremiumGate } from './PremiumGate';
 import { UserProfile } from './UserProfile';
 import { FaceRecognition } from './FaceRecognition';
 import { JarvisLogo } from './JarvisLogo';
+import { AutomationManager } from './AutomationManager';
 import { CrossPlatformAudioCapture } from './CrossPlatformAudioCapture';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Card } from './ui/card';
@@ -26,7 +27,7 @@ import { SecurityService } from '@/services/SecurityService';
 import { AutomationService } from '@/services/AutomationService';
 import PlanService, { UserTier } from '@/services/PlanService';
 import { Button } from './ui/button';
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Crown, UserCircle, Menu } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Crown, UserCircle, Menu, Bot } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ChatMessage {
@@ -73,6 +74,7 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
   const [showPremiumGate, setShowPremiumGate] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [showFaceRecognition, setShowFaceRecognition] = useState(false);
+  const [showAutomationManager, setShowAutomationManager] = useState(false);
   const [userTier, setUserTier] = useState<UserTier>('free');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { toast } = useToast();
@@ -577,6 +579,9 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
       {/* User Profile Modal */}
       <UserProfile isOpen={showUserProfile} onClose={() => setShowUserProfile(false)} />
       
+      {/* Automation Manager Modal */}
+      <AutomationManager isOpen={showAutomationManager} onClose={() => setShowAutomationManager(false)} />
+      
       {/* Header - Mobile Responsive */}
       <div className="h-14 sm:h-16 bg-background/50 backdrop-blur-sm border-b border-jarvis-blue/20 flex items-center px-2 sm:px-4">
         {/* Jarvis Logo on the left */}
@@ -619,6 +624,15 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
         
         {/* Right Actions - Mobile Responsive */}
         <div className="flex items-center gap-1 sm:gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowAutomationManager(true)}
+            className="text-jarvis-blue hover:bg-jarvis-blue/10 h-8 w-8 sm:h-10 sm:w-10"
+            title="Automation Manager"
+          >
+            <Bot className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
