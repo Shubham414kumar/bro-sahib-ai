@@ -24,14 +24,15 @@ class PlanService {
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('purchase_date', { ascending: false })
-        .limit(1);
+        .limit(1)
+        .maybeSingle();
 
       if (error) {
         console.error('Error fetching user tier:', error);
         return 'free';
       }
 
-      const purchase = purchases && purchases.length > 0 ? purchases[0] : null;
+      const purchase = purchases;
 
       if (purchase) {
         this.userTier = purchase.tier as UserTier;

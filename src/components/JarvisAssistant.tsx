@@ -128,14 +128,28 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     let response = '';
     const lowerCommand = command.toLowerCase();
 
-    // Simple command processing - AI will handle language
-    if (lowerCommand.includes('time') || lowerCommand.includes('समय') || lowerCommand.includes('samay')) {
+    // Time command - support Hindi/English
+    if (lowerCommand.includes('time') || lowerCommand.includes('समय') || lowerCommand.includes('samay') || 
+        lowerCommand.includes('टाइम') || lowerCommand.includes('बताओ')) {
       const now = new Date();
       response = `Current time is ${now.toLocaleTimeString()}`;
     } 
-    else if (lowerCommand.includes('date') || lowerCommand.includes('तारीख') || lowerCommand.includes('tarikh')) {
+    // Date command - support Hindi/English  
+    else if (lowerCommand.includes('date') || lowerCommand.includes('तारीख') || lowerCommand.includes('tarikh') ||
+             lowerCommand.includes('डेट')) {
       const today = new Date();
       response = `Today's date is ${today.toLocaleDateString()}`;
+    }
+    // Notepad command - support Hindi/English
+    else if (lowerCommand.includes('notepad') || lowerCommand.includes('नोटपैड') || 
+             (lowerCommand.includes('open') && lowerCommand.includes('note')) ||
+             (lowerCommand.includes('खोल') && lowerCommand.includes('नोट'))) {
+      response = AdvancedSystemService.executeCommand('open notepad');
+    }
+    // Calculator command - support Hindi/English
+    else if (lowerCommand.includes('calculator') || lowerCommand.includes('कैलकुलेटर') ||
+             lowerCommand.includes('calc') || lowerCommand.includes('गणना')) {
+      response = AdvancedSystemService.executeCommand('open calculator');
     }
     // Memory commands
     else if (lowerCommand.includes('my name is') || lowerCommand.includes('naam')) {
@@ -153,10 +167,11 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
         : 'I don\'t have your name saved yet';
     }
     // Web search
-    else if (lowerCommand.includes('search') || lowerCommand.includes('google') || lowerCommand.includes('खोज')) {
-      const searchMatch = command.match(/search\s+(.+)|google\s+(.+)|खोज\s+(.+)/i);
+    else if (lowerCommand.includes('search') || lowerCommand.includes('google') || 
+             lowerCommand.includes('खोज') || lowerCommand.includes('सर्च')) {
+      const searchMatch = command.match(/search\s+(.+)|google\s+(.+)|खोज\s+(.+)|सर्च\s+(.+)/i);
       if (searchMatch) {
-        const query = searchMatch[1] || searchMatch[2] || searchMatch[3];
+        const query = searchMatch[1] || searchMatch[2] || searchMatch[3] || searchMatch[4];
         response = 'Searching...';
         
         const searchingMessage: ChatMessage = {
@@ -178,12 +193,34 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
         }
       }
     }
+    // YouTube - support Hindi/English
+    else if (lowerCommand.includes('youtube') || lowerCommand.includes('यूट्यूब') ||
+             lowerCommand.includes('video') || lowerCommand.includes('वीडियो') ||
+             lowerCommand.includes('play') || lowerCommand.includes('चलाओ')) {
+      response = AdvancedSystemService.executeCommand(command);
+    }
+    // Email - support Hindi/English
+    else if (lowerCommand.includes('email') || lowerCommand.includes('ईमेल') ||
+             lowerCommand.includes('gmail') || lowerCommand.includes('जीमेल') ||
+             lowerCommand.includes('mail')) {
+      response = AdvancedSystemService.executeCommand('open email');
+    }
+    // WhatsApp - support Hindi/English
+    else if (lowerCommand.includes('whatsapp') || lowerCommand.includes('व्हाट्सएप')) {
+      response = AdvancedSystemService.executeCommand('open whatsapp');
+    }
+    // Maps - support Hindi/English
+    else if (lowerCommand.includes('map') || lowerCommand.includes('मैप') ||
+             lowerCommand.includes('navigate') || lowerCommand.includes('location')) {
+      response = AdvancedSystemService.executeCommand(command);
+    }
+    // Weather - support Hindi/English
+    else if (lowerCommand.includes('weather') || lowerCommand.includes('मौसम')) {
+      response = AdvancedSystemService.executeCommand(command);
+    }
     // Advanced System commands with tier checking
     else if (lowerCommand.includes('open') || lowerCommand.includes('खोल') || 
-             lowerCommand.includes('play') || lowerCommand.includes('youtube') ||
-             lowerCommand.includes('calculate') || lowerCommand.includes('whatsapp') ||
-             lowerCommand.includes('map') || lowerCommand.includes('email') ||
-             lowerCommand.includes('gmail') || lowerCommand.includes('weather')) {
+             lowerCommand.includes('calculate')) {
       
       // Check feature availability based on user tier
       const commandFeatureMap: Record<string, string> = {
@@ -222,7 +259,7 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
       }
     }
     // Reminders
-    else if (lowerCommand.includes('remind')) {
+    else if (lowerCommand.includes('remind') || lowerCommand.includes('याद')) {
       const reminderMatch = command.match(/remind\s+me\s+(.+?)\s+in\s+(\d+)\s+minute/i);
       if (reminderMatch) {
         const text = reminderMatch[1];
