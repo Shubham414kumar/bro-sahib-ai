@@ -23,6 +23,7 @@ import { SearchService } from '@/services/SearchService';
 import { AdvancedSystemService } from '@/services/AdvancedSystemService';
 import { ReminderService } from '@/services/ReminderService';
 import { SecurityService } from '@/services/SecurityService';
+import { AutomationService } from '@/services/AutomationService';
 import PlanService, { UserTier } from '@/services/PlanService';
 import { Button } from './ui/button';
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Crown, UserCircle, Menu } from 'lucide-react';
@@ -91,6 +92,12 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     ReminderService.requestNotificationPermission();
     // Load user tier on component mount
     PlanService.getUserTier().then(setUserTier);
+    // Start automation services
+    AutomationService.startAutomations();
+    
+    return () => {
+      AutomationService.stopAutomations();
+    };
   }, []);
 
   const handleSpeechResult = useCallback((result: any) => {
@@ -128,6 +135,22 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     let response = '';
     const lowerCommand = command.toLowerCase();
 
+    // Check for contextual responses first
+    const contextualResponse = AutomationService.getContextualResponse(command);
+    if (contextualResponse) {
+      response = contextualResponse;
+      
+      const aiMessage: ChatMessage = {
+        id: Date.now().toString(),
+        text: response,
+        isUser: false,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, aiMessage]);
+      if (!isMuted) speak(response);
+      return;
+    }
+
     // Time command - support Hindi/English
     if (lowerCommand.includes('time') || lowerCommand.includes('समय') || lowerCommand.includes('samay') || 
         lowerCommand.includes('टाइम') || lowerCommand.includes('बताओ')) {
@@ -146,10 +169,41 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
              (lowerCommand.includes('खोल') && lowerCommand.includes('नोट'))) {
       response = AdvancedSystemService.executeCommand('open notepad');
     }
-    // Calculator command - support Hindi/English
+    // Calculator command - support Hindi/English with calculations
     else if (lowerCommand.includes('calculator') || lowerCommand.includes('कैलकुलेटर') ||
-             lowerCommand.includes('calc') || lowerCommand.includes('गणना')) {
-      response = AdvancedSystemService.executeCommand('open calculator');
+             lowerCommand.includes('calc') || lowerCommand.includes('गणना') ||
+             lowerCommand.includes('calculate') || lowerCommand.includes('हिसाब')) {
+      // Check if there's a calculation to perform
+      const calcMatch = command.match(/calculate\s+(.+)|हिसाब\s+(.+)|calc\s+(.+)/i);
+      if (calcMatch) {
+        const expression = (calcMatch[1] || calcMatch[2] || calcMatch[3]).trim();
+        response = AdvancedSystemService.executeCommand(`calculate ${expression}`);
+      } else {
+        response = AdvancedSystemService.executeCommand('open calculator');
+      }
+    }
+    // Weather - support Hindi/English with real-time search
+    else if (lowerCommand.includes('weather') || lowerCommand.includes('मौसम') || 
+             lowerCommand.includes('temperature') || lowerCommand.includes('तापमान')) {
+      const cityMatch = command.match(/weather\s+(?:in|for|of)?\s*(.+)|मौसम\s+(.+)/i);
+      const city = cityMatch ? (cityMatch[1] || cityMatch[2]).trim() : 'current location';
+      
+      response = 'Checking weather...';
+      const searchingMsg: ChatMessage = {
+        id: Date.now().toString(),
+        text: response,
+        isUser: false,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, searchingMsg]);
+      if (!isMuted) speak(response);
+      
+      try {
+        const weatherInfo = await SearchService.searchWeb(`current weather in ${city}`);
+        response = weatherInfo;
+      } catch (error) {
+        response = `Unable to fetch weather for ${city}`;
+      }
     }
     // Memory commands
     else if (lowerCommand.includes('my name is') || lowerCommand.includes('naam')) {
@@ -166,38 +220,59 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
         ? `Your name is ${name}`
         : 'I don\'t have your name saved yet';
     }
-    // Web search
+    // Web search - support Hindi/English - trigger on ANY question
     else if (lowerCommand.includes('search') || lowerCommand.includes('google') || 
-             lowerCommand.includes('खोज') || lowerCommand.includes('सर्च')) {
-      const searchMatch = command.match(/search\s+(.+)|google\s+(.+)|खोज\s+(.+)|सर्च\s+(.+)/i);
-      if (searchMatch) {
-        const query = searchMatch[1] || searchMatch[2] || searchMatch[3] || searchMatch[4];
-        response = 'Searching...';
-        
-        const searchingMessage: ChatMessage = {
-          id: Date.now().toString(),
-          text: response,
-          isUser: false,
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, searchingMessage]);
-        
-        if (!isMuted) speak(response);
-        
+             lowerCommand.includes('खोज') || lowerCommand.includes('सर्च') ||
+             lowerCommand.includes('what') || lowerCommand.includes('who') || 
+             lowerCommand.includes('when') || lowerCommand.includes('where') ||
+             lowerCommand.includes('how') || lowerCommand.includes('why') ||
+             lowerCommand.includes('क्या') || lowerCommand.includes('कौन') ||
+             lowerCommand.includes('कब') || lowerCommand.includes('कहाँ') ||
+             lowerCommand.includes('कैसे') || lowerCommand.includes('क्यों')) {
+      
+      response = 'Searching for information...';
+      
+      const searchingMessage: ChatMessage = {
+        id: Date.now().toString(),
+        text: response,
+        isUser: false,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, searchingMessage]);
+      
+      if (!isMuted) speak(response);
+      
+      try {
+        const searchResult = await SearchService.searchWeb(command);
+        response = searchResult;
+      } catch (error) {
+        console.error('Search error:', error);
+        response = `I'll try my best to answer: Let me search for that...`;
+        // Fallback to AI if search fails
         try {
-          const searchResult = await SearchService.searchWeb(query);
-          response = `Search result: ${searchResult}`;
-        } catch (error) {
-          console.error('Search error:', error);
-          response = `Search failed. Please try again.`;
-        }
+          const { data, error: aiError } = await supabase.functions.invoke('openrouter-chat', {
+            body: { 
+              messages: [{ role: 'user', content: command }]
+            }
+          });
+          if (!aiError && data.message) {
+            response = data.message;
+          }
+        } catch {}
       }
     }
-    // YouTube - support Hindi/English
+    // YouTube - support Hindi/English with search
     else if (lowerCommand.includes('youtube') || lowerCommand.includes('यूट्यूब') ||
              lowerCommand.includes('video') || lowerCommand.includes('वीडियो') ||
-             lowerCommand.includes('play') || lowerCommand.includes('चलाओ')) {
-      response = AdvancedSystemService.executeCommand(command);
+             lowerCommand.includes('play') || lowerCommand.includes('चलाओ') ||
+             lowerCommand.includes('गाना') || lowerCommand.includes('song')) {
+      const searchMatch = command.match(/play\s+(.+)|youtube\s+(.+)|video\s+(.+)|गाना\s+(.+)|song\s+(.+)/i);
+      if (searchMatch) {
+        const query = (searchMatch[1] || searchMatch[2] || searchMatch[3] || searchMatch[4] || searchMatch[5]).trim();
+        response = AdvancedSystemService.executeCommand(`play youtube ${query}`);
+      } else {
+        response = AdvancedSystemService.executeCommand('open youtube');
+      }
     }
     // Email - support Hindi/English
     else if (lowerCommand.includes('email') || lowerCommand.includes('ईमेल') ||
@@ -211,54 +286,41 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     }
     // Maps - support Hindi/English
     else if (lowerCommand.includes('map') || lowerCommand.includes('मैप') ||
-             lowerCommand.includes('navigate') || lowerCommand.includes('location')) {
-      response = AdvancedSystemService.executeCommand(command);
+             lowerCommand.includes('navigate') || lowerCommand.includes('location') ||
+             lowerCommand.includes('direction') || lowerCommand.includes('दिशा')) {
+      const locationMatch = command.match(/(?:to|for)\s+(.+)|मैप\s+(.+)/i);
+      if (locationMatch) {
+        const location = (locationMatch[1] || locationMatch[2]).trim();
+        response = AdvancedSystemService.executeCommand(`maps ${location}`);
+      } else {
+        response = AdvancedSystemService.executeCommand('open maps');
+      }
     }
-    // Weather - support Hindi/English
-    else if (lowerCommand.includes('weather') || lowerCommand.includes('मौसम')) {
-      response = AdvancedSystemService.executeCommand(command);
+    // News - Hindi/English with real-time search
+    else if (lowerCommand.includes('news') || lowerCommand.includes('समाचार') ||
+             lowerCommand.includes('ख़बर') || lowerCommand.includes('khabar')) {
+      response = 'Fetching latest news...';
+      const newsMsg: ChatMessage = {
+        id: Date.now().toString(),
+        text: response,
+        isUser: false,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, newsMsg]);
+      if (!isMuted) speak(response);
+      
+      try {
+        const news = await SearchService.searchWeb('latest news today');
+        response = news;
+      } catch (error) {
+        response = 'Unable to fetch news right now';
+      }
     }
     // Advanced System commands with tier checking
-    else if (lowerCommand.includes('open') || lowerCommand.includes('खोल') || 
-             lowerCommand.includes('calculate')) {
-      
-      // Check feature availability based on user tier
-      const commandFeatureMap: Record<string, string> = {
-        'youtube': userTier === 'basic' ? 'youtube_basic' : 'youtube_full',
-        'calculator': 'calculator',
-        'browser': 'browser',
-        'chrome': 'browser',
-        'gmail': 'gmail',
-        'email': 'gmail',
-        'whatsapp': userTier === 'premium' ? 'whatsapp_messaging' : 'whatsapp_open',
-        'maps': 'maps',
-        'map': 'maps',
-        'navigate': 'maps',
-        'screen': 'screen_automation',
-        'face': 'face_recognition',
-        'study': 'study_assistant',
-        'call': userTier === 'premium' ? 'call_features' : '',
-        'phone': userTier === 'premium' ? 'call_features' : '',
-      };
-
-      // Find which feature this command needs
-      let requiredFeature = '';
-      for (const [keyword, feature] of Object.entries(commandFeatureMap)) {
-        if (lowerCommand.includes(keyword)) {
-          requiredFeature = feature;
-          break;
-        }
-      }
-
-      // Check if user has access to this feature
-      if (requiredFeature && !PlanService.isFeatureAvailable(requiredFeature)) {
-        response = "This feature requires premium membership. Click the crown icon to upgrade.";
-        setShowPremiumGate(true);
-      } else {
-        response = AdvancedSystemService.executeCommand(command);
-      }
+    else if (lowerCommand.includes('open') || lowerCommand.includes('खोल')) {
+      response = AdvancedSystemService.executeCommand(command);
     }
-    // Reminders
+    // Reminders - Hindi/English
     else if (lowerCommand.includes('remind') || lowerCommand.includes('याद')) {
       const reminderMatch = command.match(/remind\s+me\s+(.+?)\s+in\s+(\d+)\s+minute/i);
       if (reminderMatch) {
@@ -267,21 +329,56 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
         response = await ReminderService.setReminder(text, minutes);
       }
     }
-    // Use AI for all other commands - AI will respond in same language as user
+    // For everything else - use AI with web search capability
     else {
-      console.log('No specific command matched, using AI');
+      console.log('Using intelligent AI with search capability');
+      
+      // Show searching indicator
+      response = 'Let me find that for you...';
+      const searchingMsg: ChatMessage = {
+        id: Date.now().toString(),
+        text: response,
+        isUser: false,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, searchingMsg]);
+      if (!isMuted) speak(response);
+      
       try {
-        const { data, error } = await supabase.functions.invoke('openrouter-chat', {
-          body: { 
-            messages: [{ role: 'user', content: command }]
-          }
-        });
+        // First try web search for factual/current information
+        if (lowerCommand.includes('latest') || lowerCommand.includes('current') || 
+            lowerCommand.includes('today') || lowerCommand.includes('now') ||
+            lowerCommand.includes('price') || lowerCommand.includes('score')) {
+          const searchResult = await SearchService.searchWeb(command);
+          response = searchResult;
+        } else {
+          // Use AI for conversational responses
+          const { data, error } = await supabase.functions.invoke('openrouter-chat', {
+            body: { 
+              messages: [{ role: 'user', content: command }]
+            }
+          });
 
-        if (error) throw error;
-        response = data.message || 'I did not understand that command.';
+          if (error) throw error;
+          response = data.message || 'Let me search that for you...';
+          
+          // If AI doesn't have answer, search web
+          if (response.toLowerCase().includes("i don't know") || 
+              response.toLowerCase().includes("i cannot") ||
+              response.toLowerCase().includes("sorry")) {
+            const searchResult = await SearchService.searchWeb(command);
+            response = searchResult;
+          }
+        }
       } catch (error) {
         console.error('AI response error:', error);
-        response = 'Sorry, I could not process that. Please try again.';
+        // Last resort - try web search
+        try {
+          const searchResult = await SearchService.searchWeb(command);
+          response = searchResult;
+        } catch {
+          response = 'I\'m having trouble right now. Please try again.';
+        }
       }
     }
 
