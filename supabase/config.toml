@@ -35,3 +35,9 @@ verify_jwt = true
 
 [functions.openrouter-chat]
 verify_jwt = true
+
+[functions.cybersecurity-ai]
+verify_jwt = false
+
+[functions.process-automations]
+verify_jwt = false

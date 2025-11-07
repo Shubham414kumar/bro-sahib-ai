@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      automation_logs: {
+        Row: {
+          automation_id: string
+          created_at: string
+          error_message: string | null
+          execution_duration_ms: number | null
+          execution_time: string
+          id: string
+          result_data: Json | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          automation_id: string
+          created_at?: string
+          error_message?: string | null
+          execution_duration_ms?: number | null
+          execution_time?: string
+          id?: string
+          result_data?: Json | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          automation_id?: string
+          created_at?: string
+          error_message?: string | null
+          execution_duration_ms?: number | null
+          execution_time?: string
+          id?: string
+          result_data?: Json | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_logs_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "custom_automations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_history: {
         Row: {
           created_at: string

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -8,9 +9,11 @@ import { Textarea } from './ui/textarea';
 import { Switch } from './ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
+import { Badge } from './ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Trash2, Edit2, Clock, Bell, Command as CommandIcon } from 'lucide-react';
+import { Plus, Trash2, Edit2, Clock, Bell, Command as CommandIcon, PlayCircle, History, AlertCircle } from 'lucide-react';
 
 interface Automation {
   id: string;
@@ -29,6 +32,17 @@ interface Automation {
   };
   is_active: boolean;
   next_run?: string;
+  last_run?: string;
+}
+
+interface AutomationLog {
+  id: string;
+  automation_id: string;
+  execution_time: string;
+  status: 'success' | 'failed' | 'skipped';
+  result_data?: any;
+  error_message?: string;
+  execution_duration_ms?: number;
 }
 
 interface AutomationManagerProps {
@@ -38,9 +52,14 @@ interface AutomationManagerProps {
 
 export const AutomationManager = ({ isOpen, onClose }: AutomationManagerProps) => {
   const [automations, setAutomations] = useState<Automation[]>([]);
+  const [logs, setLogs] = useState<AutomationLog[]>([]);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingAutomation, setEditingAutomation] = useState<Automation | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [selectedAutomationLogs, setSelectedAutomationLogs] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Form state
   const [formData, setFormData] = useState({
@@ -63,6 +82,27 @@ export const AutomationManager = ({ isOpen, onClose }: AutomationManagerProps) =
   useEffect(() => {
     if (isOpen) {
       loadAutomations();
+      loadLogs();
+      
+      // Subscribe to realtime logs
+      const channel = supabase
+        .channel('automation-logs-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'automation_logs'
+          },
+          (payload) => {
+            setLogs(prev => [payload.new as AutomationLog, ...prev]);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [isOpen]);
 
@@ -89,7 +129,73 @@ export const AutomationManager = ({ isOpen, onClose }: AutomationManagerProps) =
     }
   };
 
+  const loadLogs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('automation_logs')
+        .select('*')
+        .order('execution_time', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      setLogs((data || []) as AutomationLog[]);
+    } catch (error) {
+      console.error('Error loading logs:', error);
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      errors.name = 'Name is required';
+    }
+
+    if (formData.type === 'daily' && !formData.schedule_time) {
+      errors.schedule_time = 'Time is required for daily automations';
+    }
+
+    if (formData.type === 'recurring') {
+      if (!formData.interval_minutes || formData.interval_minutes < 1) {
+        errors.interval_minutes = 'Interval must be at least 1 minute';
+      }
+    }
+
+    if (formData.type === 'reminder' && !formData.reminder_datetime) {
+      errors.reminder_datetime = 'Date and time are required for reminders';
+    }
+
+    if (formData.action_type === 'notification') {
+      if (!formData.action_data.title?.trim()) {
+        errors.title = 'Title is required';
+      }
+      if (!formData.action_data.message?.trim()) {
+        errors.message = 'Message is required';
+      }
+    }
+
+    if (formData.action_type === 'search' && !formData.action_data.query?.trim()) {
+      errors.query = 'Search query is required';
+    }
+
+    if (formData.action_type === 'command' && !formData.action_data.command?.trim()) {
+      errors.command = 'Command is required';
+    }
+
+    if (formData.action_type === 'webhook' && !formData.action_data.url?.trim()) {
+      errors.url = 'URL is required';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSaveAutomation = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast({
@@ -194,6 +300,7 @@ export const AutomationManager = ({ isOpen, onClose }: AutomationManagerProps) =
         description: 'Automation deleted successfully'
       });
       
+      setDeleteConfirmId(null);
       loadAutomations();
     } catch (error) {
       console.error('Error deleting automation:', error);
@@ -204,6 +311,38 @@ export const AutomationManager = ({ isOpen, onClose }: AutomationManagerProps) =
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTestAutomation = async (automation: Automation) => {
+    setTestingId(automation.id);
+    try {
+      toast({
+        title: 'Testing Automation',
+        description: `Running ${automation.name}...`
+      });
+
+      // Trigger the edge function to process this specific automation
+      const { error } = await supabase.functions.invoke('process-automations');
+
+      if (error) throw error;
+
+      toast({
+        title: 'Test Complete',
+        description: 'Check the logs tab for results'
+      });
+      
+      loadAutomations();
+      loadLogs();
+    } catch (error) {
+      console.error('Error testing automation:', error);
+      toast({
+        title: 'Test Failed',
+        description: error instanceof Error ? error.message : 'Failed to test automation',
+        variant: 'destructive'
+      });
+    } finally {
+      setTestingId(null);
     }
   };
 
@@ -273,6 +412,7 @@ export const AutomationManager = ({ isOpen, onClose }: AutomationManagerProps) =
       },
       is_active: true
     });
+    setFormErrors({});
   };
 
   const getActionIcon = (type: string) => {
@@ -295,82 +435,162 @@ export const AutomationManager = ({ isOpen, onClose }: AutomationManagerProps) =
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <Button 
-              onClick={() => {
-                resetForm();
-                setEditingAutomation(null);
-                setShowAddDialog(true);
-              }}
-              className="w-full"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Create New Automation
-            </Button>
+          <Tabs defaultValue="automations" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="automations">Automations</TabsTrigger>
+              <TabsTrigger value="logs">Execution Logs</TabsTrigger>
+            </TabsList>
 
-            <ScrollArea className="h-[400px]">
-              <div className="space-y-2">
-                {loading && automations.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">Loading...</p>
-                ) : automations.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    No automations yet. Create your first one!
-                  </p>
-                ) : (
-                  automations.map((automation) => (
-                    <Card key={automation.id} className="relative">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            {getActionIcon(automation.type)}
-                            <CardTitle className="text-lg">{automation.name}</CardTitle>
+            <TabsContent value="automations" className="space-y-4">
+              <Button 
+                onClick={() => {
+                  resetForm();
+                  setEditingAutomation(null);
+                  setShowAddDialog(true);
+                }}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create New Automation
+              </Button>
+
+              <ScrollArea className="h-[400px]">
+                <div className="space-y-2">
+                  {loading && automations.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">Loading...</p>
+                  ) : automations.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">
+                      No automations yet. Create your first one!
+                    </p>
+                  ) : (
+                    automations.map((automation) => (
+                      <Card key={automation.id} className="relative">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-2">
+                              {getActionIcon(automation.type)}
+                              <div>
+                                <CardTitle className="text-lg">{automation.name}</CardTitle>
+                                <CardDescription>
+                                  {automation.type === 'daily' && `Daily at ${automation.schedule_time}`}
+                                  {automation.type === 'recurring' && `Every ${automation.interval_minutes} minutes`}
+                                  {automation.type === 'reminder' && `On ${new Date(automation.reminder_datetime!).toLocaleString()}`}
+                                </CardDescription>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={automation.is_active}
+                                onCheckedChange={() => handleToggleActive(automation)}
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleTestAutomation(automation)}
+                                disabled={testingId === automation.id}
+                                title="Test Run"
+                              >
+                                <PlayCircle className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEditAutomation(automation)}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setDeleteConfirmId(automation.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              checked={automation.is_active}
-                              onCheckedChange={() => handleToggleActive(automation)}
-                            />
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEditAutomation(automation)}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteAutomation(automation.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-sm space-y-1">
+                            <p><strong>Action:</strong> {automation.action_type}</p>
+                            {automation.action_data.title && <p><strong>Title:</strong> {automation.action_data.title}</p>}
+                            {automation.action_data.message && <p><strong>Message:</strong> {automation.action_data.message}</p>}
+                            {automation.action_data.command && <p><strong>Command:</strong> {automation.action_data.command}</p>}
+                            {automation.last_run && (
+                              <p className="text-muted-foreground">
+                                <strong>Last run:</strong> {new Date(automation.last_run).toLocaleString()}
+                              </p>
+                            )}
+                            {automation.next_run && (
+                              <p className="text-muted-foreground">
+                                <strong>Next run:</strong> {new Date(automation.next_run).toLocaleString()}
+                              </p>
+                            )}
                           </div>
-                        </div>
-                        <CardDescription>
-                          {automation.type === 'daily' && `Daily at ${automation.schedule_time}`}
-                          {automation.type === 'recurring' && `Every ${automation.interval_minutes} minutes`}
-                          {automation.type === 'reminder' && `On ${new Date(automation.reminder_datetime!).toLocaleString()}`}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-sm space-y-1">
-                          <p><strong>Action:</strong> {automation.action_type}</p>
-                          {automation.action_data.title && <p><strong>Title:</strong> {automation.action_data.title}</p>}
-                          {automation.action_data.message && <p><strong>Message:</strong> {automation.action_data.message}</p>}
-                          {automation.action_data.command && <p><strong>Command:</strong> {automation.action_data.command}</p>}
-                          {automation.next_run && (
-                            <p className="text-muted-foreground">
-                              <strong>Next run:</strong> {new Date(automation.next_run).toLocaleString()}
-                            </p>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="logs" className="space-y-4">
+              <ScrollArea className="h-[400px]">
+                <div className="space-y-2">
+                  {logs.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">
+                      No execution logs yet
+                    </p>
+                  ) : (
+                    logs.map((log) => {
+                      const automation = automations.find(a => a.id === log.automation_id);
+                      return (
+                        <Card key={log.id}>
+                          <CardContent className="pt-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Badge variant={
+                                    log.status === 'success' ? 'default' : 
+                                    log.status === 'failed' ? 'destructive' : 
+                                    'secondary'
+                                  }>
+                                    {log.status}
+                                  </Badge>
+                                  <span className="text-sm font-medium">
+                                    {automation?.name || 'Unknown Automation'}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mb-1">
+                                  {new Date(log.execution_time).toLocaleString()}
+                                </p>
+                                {log.execution_duration_ms && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Duration: {log.execution_duration_ms}ms
+                                  </p>
+                                )}
+                                {log.error_message && (
+                                  <div className="mt-2 flex items-start gap-2 text-xs text-destructive">
+                                    <AlertCircle className="h-3 w-3 mt-0.5" />
+                                    <span>{log.error_message}</span>
+                                  </div>
+                                )}
+                                {log.result_data && (
+                                  <pre className="mt-2 text-xs bg-muted p-2 rounded overflow-x-auto">
+                                    {JSON.stringify(log.result_data, null, 2)}
+                                  </pre>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
@@ -390,9 +610,18 @@ export const AutomationManager = ({ isOpen, onClose }: AutomationManagerProps) =
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value });
+                  if (formErrors.name) {
+                    setFormErrors({ ...formErrors, name: '' });
+                  }
+                }}
                 placeholder="e.g., Morning News Update"
+                className={formErrors.name ? 'border-destructive' : ''}
               />
+              {formErrors.name && (
+                <p className="text-xs text-destructive mt-1">{formErrors.name}</p>
+              )}
             </div>
 
             <div>
@@ -419,8 +648,17 @@ export const AutomationManager = ({ isOpen, onClose }: AutomationManagerProps) =
                   id="schedule_time"
                   type="time"
                   value={formData.schedule_time}
-                  onChange={(e) => setFormData({ ...formData, schedule_time: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, schedule_time: e.target.value });
+                    if (formErrors.schedule_time) {
+                      setFormErrors({ ...formErrors, schedule_time: '' });
+                    }
+                  }}
+                  className={formErrors.schedule_time ? 'border-destructive' : ''}
                 />
+                {formErrors.schedule_time && (
+                  <p className="text-xs text-destructive mt-1">{formErrors.schedule_time}</p>
+                )}
               </div>
             )}
 
@@ -432,8 +670,17 @@ export const AutomationManager = ({ isOpen, onClose }: AutomationManagerProps) =
                   type="number"
                   min="1"
                   value={formData.interval_minutes}
-                  onChange={(e) => setFormData({ ...formData, interval_minutes: parseInt(e.target.value) })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, interval_minutes: parseInt(e.target.value) });
+                    if (formErrors.interval_minutes) {
+                      setFormErrors({ ...formErrors, interval_minutes: '' });
+                    }
+                  }}
+                  className={formErrors.interval_minutes ? 'border-destructive' : ''}
                 />
+                {formErrors.interval_minutes && (
+                  <p className="text-xs text-destructive mt-1">{formErrors.interval_minutes}</p>
+                )}
               </div>
             )}
 
@@ -444,8 +691,17 @@ export const AutomationManager = ({ isOpen, onClose }: AutomationManagerProps) =
                   id="reminder_datetime"
                   type="datetime-local"
                   value={formData.reminder_datetime}
-                  onChange={(e) => setFormData({ ...formData, reminder_datetime: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, reminder_datetime: e.target.value });
+                    if (formErrors.reminder_datetime) {
+                      setFormErrors({ ...formErrors, reminder_datetime: '' });
+                    }
+                  }}
+                  className={formErrors.reminder_datetime ? 'border-destructive' : ''}
                 />
+                {formErrors.reminder_datetime && (
+                  <p className="text-xs text-destructive mt-1">{formErrors.reminder_datetime}</p>
+                )}
               </div>
             )}
 
@@ -462,6 +718,7 @@ export const AutomationManager = ({ isOpen, onClose }: AutomationManagerProps) =
                   <SelectItem value="notification">Show Notification</SelectItem>
                   <SelectItem value="search">Web Search</SelectItem>
                   <SelectItem value="command">Execute Command</SelectItem>
+                  <SelectItem value="webhook">Webhook</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -473,24 +730,42 @@ export const AutomationManager = ({ isOpen, onClose }: AutomationManagerProps) =
                   <Input
                     id="title"
                     value={formData.action_data.title}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      action_data: { ...formData.action_data, title: e.target.value }
-                    })}
+                    onChange={(e) => {
+                      setFormData({ 
+                        ...formData, 
+                        action_data: { ...formData.action_data, title: e.target.value }
+                      });
+                      if (formErrors.title) {
+                        setFormErrors({ ...formErrors, title: '' });
+                      }
+                    }}
                     placeholder="Notification title"
+                    className={formErrors.title ? 'border-destructive' : ''}
                   />
+                  {formErrors.title && (
+                    <p className="text-xs text-destructive mt-1">{formErrors.title}</p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="message">Message</Label>
                   <Textarea
                     id="message"
                     value={formData.action_data.message}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      action_data: { ...formData.action_data, message: e.target.value }
-                    })}
+                    onChange={(e) => {
+                      setFormData({ 
+                        ...formData, 
+                        action_data: { ...formData.action_data, message: e.target.value }
+                      });
+                      if (formErrors.message) {
+                        setFormErrors({ ...formErrors, message: '' });
+                      }
+                    }}
                     placeholder="Notification message"
+                    className={formErrors.message ? 'border-destructive' : ''}
                   />
+                  {formErrors.message && (
+                    <p className="text-xs text-destructive mt-1">{formErrors.message}</p>
+                  )}
                 </div>
               </>
             )}
@@ -501,12 +776,21 @@ export const AutomationManager = ({ isOpen, onClose }: AutomationManagerProps) =
                 <Input
                   id="query"
                   value={formData.action_data.query}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
-                    action_data: { ...formData.action_data, query: e.target.value }
-                  })}
+                  onChange={(e) => {
+                    setFormData({ 
+                      ...formData, 
+                      action_data: { ...formData.action_data, query: e.target.value }
+                    });
+                    if (formErrors.query) {
+                      setFormErrors({ ...formErrors, query: '' });
+                    }
+                  }}
                   placeholder="e.g., latest tech news"
+                  className={formErrors.query ? 'border-destructive' : ''}
                 />
+                {formErrors.query && (
+                  <p className="text-xs text-destructive mt-1">{formErrors.query}</p>
+                )}
               </div>
             )}
 
@@ -516,12 +800,45 @@ export const AutomationManager = ({ isOpen, onClose }: AutomationManagerProps) =
                 <Input
                   id="command"
                   value={formData.action_data.command}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
-                    action_data: { ...formData.action_data, command: e.target.value }
-                  })}
+                  onChange={(e) => {
+                    setFormData({ 
+                      ...formData, 
+                      action_data: { ...formData.action_data, command: e.target.value }
+                    });
+                    if (formErrors.command) {
+                      setFormErrors({ ...formErrors, command: '' });
+                    }
+                  }}
                   placeholder="e.g., play youtube relaxing music"
+                  className={formErrors.command ? 'border-destructive' : ''}
                 />
+                {formErrors.command && (
+                  <p className="text-xs text-destructive mt-1">{formErrors.command}</p>
+                )}
+              </div>
+            )}
+
+            {formData.action_type === 'webhook' && (
+              <div>
+                <Label htmlFor="url">Webhook URL</Label>
+                <Input
+                  id="url"
+                  value={formData.action_data.url}
+                  onChange={(e) => {
+                    setFormData({ 
+                      ...formData, 
+                      action_data: { ...formData.action_data, url: e.target.value }
+                    });
+                    if (formErrors.url) {
+                      setFormErrors({ ...formErrors, url: '' });
+                    }
+                  }}
+                  placeholder="https://example.com/webhook"
+                  className={formErrors.url ? 'border-destructive' : ''}
+                />
+                {formErrors.url && (
+                  <p className="text-xs text-destructive mt-1">{formErrors.url}</p>
+                )}
               </div>
             )}
 
@@ -556,6 +873,27 @@ export const AutomationManager = ({ isOpen, onClose }: AutomationManagerProps) =
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this automation. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteConfirmId && handleDeleteAutomation(deleteConfirmId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
