@@ -25,23 +25,11 @@ interface CustomAutomation {
 
 export class AutomationService {
   private static automations: Map<string, NodeJS.Timeout> = new Map();
-  private static customAutomations: CustomAutomation[] = [];
-  private static checkInterval: NodeJS.Timeout | null = null;
 
-  // Start automation services
+  // Start built-in automation services only
+  // Custom automations are handled by the process-automations edge function
   static async startAutomations() {
-    console.log('🤖 Starting automation services');
-    
-    // Load custom automations from database
-    await this.loadCustomAutomations();
-    
-    // Start checking for due automations every minute
-    this.checkInterval = setInterval(() => {
-      this.checkDueAutomations();
-    }, 60000); // Check every minute
-    
-    // Check immediately on start
-    this.checkDueAutomations();
+    console.log('🤖 Starting built-in automation services');
     
     // Built-in automations
     // Morning briefing at 8 AM
@@ -77,53 +65,15 @@ export class AutomationService {
     });
   }
 
-  // Load custom automations from database
-  static async loadCustomAutomations() {
+  // Test execute an automation manually (for Test Run button)
+  static async testExecuteAutomation(automation: CustomAutomation): Promise<{ success: boolean; message: string }> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('custom_automations')
-        .select('*')
-        .eq('is_active', true);
-
-      if (error) throw error;
-
-      this.customAutomations = (data || []) as CustomAutomation[];
-      console.log(`📋 Loaded ${this.customAutomations.length} custom automations`);
-    } catch (error) {
-      console.error('Error loading custom automations:', error);
-    }
-  }
-
-  // Check for due automations
-  static async checkDueAutomations() {
-    const now = new Date();
-    
-    for (const automation of this.customAutomations) {
-      if (!automation.is_active || !automation.next_run) continue;
+      console.log(`🧪 Test executing automation: ${automation.name}`);
       
-      const nextRun = new Date(automation.next_run);
-      
-      // If automation is due
-      if (nextRun <= now) {
-        console.log(`⏰ Executing automation: ${automation.name}`);
-        await this.executeAutomation(automation);
-        
-        // Update next run time
-        await this.updateNextRun(automation);
-      }
-    }
-  }
-
-  // Execute an automation
-  static async executeAutomation(automation: CustomAutomation) {
-    try {
       switch (automation.action_type) {
         case 'notification':
           toast({
-            title: automation.action_data.title || automation.name,
+            title: `[TEST] ${automation.action_data.title || automation.name}`,
             description: automation.action_data.message || '',
             duration: 5000,
           });
@@ -133,7 +83,7 @@ export class AutomationService {
           if (automation.action_data.query) {
             const result = await SearchService.searchWeb(automation.action_data.query);
             toast({
-              title: `Search Results: ${automation.action_data.query}`,
+              title: `[TEST] Search: ${automation.action_data.query}`,
               description: result.substring(0, 200) + '...',
               duration: 10000,
             });
@@ -144,72 +94,67 @@ export class AutomationService {
           if (automation.action_data.command) {
             const result = AdvancedSystemService.executeCommand(automation.action_data.command);
             toast({
-              title: 'Command Executed',
+              title: '[TEST] Command Executed',
               description: result,
               duration: 5000,
             });
           }
           break;
+
+        case 'webhook':
+          if (automation.action_data.url) {
+            toast({
+              title: '[TEST] Webhook',
+              description: `Would call: ${automation.action_data.url}`,
+              duration: 5000,
+            });
+          }
+          break;
+
+        default:
+          throw new Error('Unknown action type');
       }
 
-      // Update last_run
-      await supabase
-        .from('custom_automations')
-        .update({ last_run: new Date().toISOString() })
-        .eq('id', automation.id);
+      // Log the test execution
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('automation_logs').insert({
+          automation_id: automation.id,
+          user_id: user.id,
+          execution_time: new Date().toISOString(),
+          status: 'success',
+          result_data: { test_run: true },
+        });
+      }
+
+      return { success: true, message: 'Test executed successfully!' };
 
     } catch (error) {
-      console.error(`Error executing automation ${automation.name}:`, error);
-    }
-  }
-
-  // Update next run time
-  static async updateNextRun(automation: CustomAutomation) {
-    let nextRun: Date | null = null;
-    const now = new Date();
-
-    if (automation.type === 'daily' && automation.schedule_time) {
-      const [hours, minutes] = automation.schedule_time.split(':').map(Number);
-      nextRun = new Date(now);
-      nextRun.setHours(hours, minutes, 0, 0);
+      console.error(`Error test executing automation:`, error);
       
-      // If time has passed today, schedule for tomorrow
-      if (nextRun <= now) {
-        nextRun.setDate(nextRun.getDate() + 1);
+      // Log the failed test execution
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('automation_logs').insert({
+          automation_id: automation.id,
+          user_id: user.id,
+          execution_time: new Date().toISOString(),
+          status: 'failed',
+          error_message: error instanceof Error ? error.message : 'Unknown error',
+          result_data: { test_run: true },
+        });
       }
-    } else if (automation.type === 'recurring' && automation.interval_minutes) {
-      nextRun = new Date(now.getTime() + automation.interval_minutes * 60000);
-    } else if (automation.type === 'reminder') {
-      // One-time reminder, deactivate after execution
-      await supabase
-        .from('custom_automations')
-        .update({ is_active: false })
-        .eq('id', automation.id);
-      
-      // Reload automations
-      await this.loadCustomAutomations();
-      return;
-    }
 
-    if (nextRun) {
-      await supabase
-        .from('custom_automations')
-        .update({ next_run: nextRun.toISOString() })
-        .eq('id', automation.id);
+      return { 
+        success: false, 
+        message: error instanceof Error ? error.message : 'Test execution failed' 
+      };
     }
-
-    // Reload automations to get updated data
-    await this.loadCustomAutomations();
   }
 
   // Stop all automations
   static stopAutomations() {
-    console.log('🛑 Stopping all automations');
-    
-    if (this.checkInterval) {
-      clearInterval(this.checkInterval);
-      this.checkInterval = null;
-    }
+    console.log('🛑 Stopping built-in automations');
     
     this.automations.forEach((timeout) => clearTimeout(timeout));
     this.automations.clear();

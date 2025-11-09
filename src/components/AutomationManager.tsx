@@ -13,6 +13,7 @@ import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { AutomationService } from '@/services/AutomationService';
 import { Plus, Trash2, Edit2, Clock, Bell, Command as CommandIcon, PlayCircle, History, AlertCircle } from 'lucide-react';
 
 interface Automation {
@@ -322,15 +323,21 @@ export const AutomationManager = ({ isOpen, onClose }: AutomationManagerProps) =
         description: `Running ${automation.name}...`
       });
 
-      // Trigger the edge function to process this specific automation
-      const { error } = await supabase.functions.invoke('process-automations');
-
-      if (error) throw error;
-
-      toast({
-        title: 'Test Complete',
-        description: 'Check the logs tab for results'
-      });
+      // Use AutomationService to test execute locally
+      const result = await AutomationService.testExecuteAutomation(automation as any);
+      
+      if (result.success) {
+        toast({
+          title: '✅ Test Successful',
+          description: result.message
+        });
+      } else {
+        toast({
+          title: '⚠️ Test Completed',
+          description: result.message,
+          variant: 'destructive'
+        });
+      }
       
       loadAutomations();
       loadLogs();
