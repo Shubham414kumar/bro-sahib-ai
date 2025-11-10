@@ -45,11 +45,26 @@ export const useTextToSpeech = (): UseTextToSpeechReturn => {
     // Stop any current speech
     speechSynthesis.cancel();
 
-    const utterance = new SpeechSynthesisUtterance(text);
+    // Add natural pauses for better flow
+    const processedText = text
+      .replace(/\.\.\./g, '... ')
+      .replace(/([.!?])\s+/g, '$1 ')
+      .replace(/,/g, ', ');
+
+    const utterance = new SpeechSynthesisUtterance(processedText);
+    
+    // Dynamic rate based on content length for natural flow
+    const wordCount = text.split(' ').length;
+    let dynamicRate = 1.0;
+    if (wordCount < 10) {
+      dynamicRate = 0.95; // Slower for short responses
+    } else if (wordCount > 50) {
+      dynamicRate = 1.05; // Slightly faster for long responses
+    }
     
     // Enhanced voice settings for natural, lively tone
-    utterance.rate = options?.rate || 1;
-    utterance.pitch = options?.pitch || 1.2; // Slightly higher pitch for energetic feel
+    utterance.rate = options?.rate || dynamicRate;
+    utterance.pitch = options?.pitch || 1.15; // Natural feminine pitch
     utterance.volume = options?.volume || 1;
     utterance.lang = options?.lang || 'en-US';
 
@@ -60,18 +75,38 @@ export const useTextToSpeech = (): UseTextToSpeechReturn => {
       let selectedVoice: SpeechSynthesisVoice | undefined;
       
       if (options?.lang === 'hi-IN') {
-        // For Hindi: Google हिन्दी
+        // For Hindi: Prefer Google Hindi voices
         selectedVoice = voices.find(voice => 
           voice.lang === 'hi-IN' && voice.name.includes('Google')
+        ) || voices.find(voice => 
+          voice.lang === 'hi-IN' && (voice.name.includes('Female') || voice.name.includes('Lekha'))
         ) || voices.find(voice => voice.lang === 'hi-IN');
       } else {
-        // Always prefer female voices with priority order
-        selectedVoice = voices.find(voice => 
-          voice.lang.startsWith('en') && 
-          (voice.name.includes('Female') || voice.name.includes('Samantha') || voice.name.includes('Victoria'))
-        ) || voices.find(voice => 
-          voice.lang.startsWith('en') && voice.name.includes('Google')
-        ) || voices.find(voice => voice.lang.startsWith('en'));
+        // Enhanced female voice selection for English with priority order
+        selectedVoice = 
+          // Priority 1: Natural female voices (Samantha is best on Apple devices)
+          voices.find(voice => 
+            voice.lang.startsWith('en') && voice.name.includes('Samantha')
+          ) ||
+          // Priority 2: Other high-quality female voices
+          voices.find(voice => 
+            voice.lang.startsWith('en') && 
+            (voice.name.includes('Victoria') || voice.name.includes('Karen') || voice.name.includes('Zira'))
+          ) ||
+          // Priority 3: Google female voices
+          voices.find(voice => 
+            voice.lang.startsWith('en') && voice.name.includes('Google') && voice.name.includes('Female')
+          ) ||
+          // Priority 4: Any female voice
+          voices.find(voice => 
+            voice.lang.startsWith('en') && voice.name.toLowerCase().includes('female')
+          ) ||
+          // Priority 5: Any Google English voice
+          voices.find(voice => 
+            voice.lang.startsWith('en') && voice.name.includes('Google')
+          ) ||
+          // Fallback: Any English voice
+          voices.find(voice => voice.lang.startsWith('en'));
       }
       
       if (selectedVoice) {
