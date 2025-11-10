@@ -82,6 +82,33 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_summaries: {
+        Row: {
+          created_at: string
+          id: string
+          message_count: number
+          summary: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_count?: number
+          summary: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_count?: number
+          summary?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       custom_automations: {
         Row: {
           action_data: Json
@@ -367,6 +394,36 @@ export type Database = {
           plan_type?: string | null
           status?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      user_memories: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          memory_key: string
+          memory_value: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          memory_key: string
+          memory_value: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          memory_key?: string
+          memory_value?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
