@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Moon, Sun, Volume2, VolumeX, ScrollText } from 'lucide-react';
+import { ArrowLeft, Moon, Sun, Volume2, VolumeX, ScrollText, Bot } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -53,6 +53,29 @@ const Settings = () => {
 
         {/* Settings Cards */}
         <div className="space-y-4 max-w-2xl">
+          {/* JARVIS Personality */}
+          <Card className="p-6 bg-card/50 backdrop-blur-sm border-jarvis-blue/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Bot className="h-5 w-5 text-jarvis-blue" />
+                <div>
+                  <Label className="text-base font-semibold">JARVIS Personality</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Customize response style and behavior
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/jarvis-settings')}
+                className="border-jarvis-blue/30 hover:bg-jarvis-blue/10"
+              >
+                Configure
+              </Button>
+            </div>
+          </Card>
+
           {/* Theme */}
           <Card className="p-6 bg-card/50 backdrop-blur-sm border-jarvis-blue/30">
             <div className="flex items-center justify-between">

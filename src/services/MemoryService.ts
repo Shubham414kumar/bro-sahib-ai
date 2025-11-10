@@ -1,105 +1,177 @@
-import { SecurityService } from './SecurityService';
-import { SecureEncryption } from './SecureEncryption';
+import { supabase } from '@/integrations/supabase/client';
 
-interface MemoryItem {
-  key: string;
-  value: string;
-  timestamp: Date;
-  encrypted: boolean;
+export interface UserMemory {
+  id?: string;
+  user_id: string;
+  memory_key: string;
+  memory_value: string;
+  category: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ConversationSummary {
+  id?: string;
+  user_id: string;
+  summary: string;
+  message_count: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export class MemoryService {
-  private static STORAGE_KEY = 'jarvis_memory';
-  private static readonly MAX_MEMORIES = 100;
-  private static readonly MAX_VALUE_LENGTH = 1000;
-
-  static async saveMemory(key: string, value: string): Promise<void> {
+  // Store a memory for the user
+  static async saveMemory(
+    userId: string,
+    key: string,
+    value: string,
+    category: string = 'general'
+  ): Promise<boolean> {
     try {
-      // Validate and sanitize inputs
-      const sanitizedKey = SecurityService.sanitizeInput(key, 50);
-      const sanitizedValue = SecurityService.sanitizeInput(value, this.MAX_VALUE_LENGTH);
-      
-      if (!sanitizedKey || !sanitizedValue) {
-        SecurityService.logSecurityEvent('INVALID_MEMORY_INPUT', `Key: ${key}, Value length: ${value.length}`);
-        return;
-      }
+      const { error } = await supabase
+        .from('user_memories')
+        .upsert({
+          user_id: userId,
+          memory_key: key,
+          memory_value: value,
+          category,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,memory_key'
+        });
 
-      const memories = await this.getAllMemories();
-      
-      // Prevent memory overflow
-      if (memories.length >= this.MAX_MEMORIES) {
-        memories.shift(); // Remove oldest memory
-      }
-      
-      const encryptedValue = await SecureEncryption.encrypt(sanitizedValue);
-      const newMemory: MemoryItem = {
-        key: sanitizedKey.toLowerCase(),
-        value: encryptedValue,
-        timestamp: new Date(),
-        encrypted: true
-      };
-      
-      memories.push(newMemory);
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(memories));
-      console.log(`Memory saved securely: ${sanitizedKey}`);
+      if (error) throw error;
+      return true;
     } catch (error) {
-      SecurityService.logSecurityEvent('MEMORY_SAVE_ERROR', error.message);
+      console.error('Error saving memory:', error);
+      return false;
     }
   }
 
-  static async getMemory(key: string): Promise<string | null> {
+  // Get a specific memory
+  static async getMemory(userId: string, key: string): Promise<string | null> {
     try {
-      const sanitizedKey = SecurityService.sanitizeInput(key, 50);
-      if (!sanitizedKey) return null;
-      
-      const memories = await this.getAllMemories();
-      const memory = memories.find(m => m.key === sanitizedKey.toLowerCase());
-      
-      if (!memory) return null;
-      
-      if (memory.encrypted) {
-        return await SecureEncryption.decrypt(memory.value);
-      }
-      
-      return memory.value;
+      const { data, error } = await supabase
+        .from('user_memories')
+        .select('memory_value')
+        .eq('user_id', userId)
+        .eq('memory_key', key)
+        .single();
+
+      if (error) throw error;
+      return data?.memory_value || null;
     } catch (error) {
-      SecurityService.logSecurityEvent('MEMORY_READ_ERROR', error.message);
+      console.error('Error getting memory:', error);
       return null;
     }
   }
 
-  static async getAllMemories(): Promise<MemoryItem[]> {
+  // Get all memories for a user
+  static async getAllMemories(userId: string, category?: string): Promise<UserMemory[]> {
     try {
-      const stored = localStorage.getItem(this.STORAGE_KEY);
-      if (!stored) return [];
-      
-      const parsed = JSON.parse(stored);
-      
-      // Validate stored data structure
-      if (!Array.isArray(parsed)) {
-        SecurityService.logSecurityEvent('CORRUPTED_MEMORY_DATA', 'Invalid data structure');
-        this.clearMemory();
-        return [];
+      let query = supabase
+        .from('user_memories')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (category) {
+        query = query.eq('category', category);
       }
-      
-      return parsed.filter(item => 
-        item && 
-        typeof item.key === 'string' && 
-        typeof item.value === 'string'
-      );
+
+      const { data, error } = await query.order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
-      SecurityService.logSecurityEvent('MEMORY_PARSE_ERROR', error.message);
-      this.clearMemory();
+      console.error('Error getting memories:', error);
       return [];
     }
   }
 
-  static clearMemory(): void {
-    localStorage.removeItem(this.STORAGE_KEY);
+  // Delete a memory
+  static async deleteMemory(userId: string, key: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('user_memories')
+        .delete()
+        .eq('user_id', userId)
+        .eq('memory_key', key);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error deleting memory:', error);
+      return false;
+    }
   }
 
-  static async hasMemoryOf(key: string): Promise<boolean> {
-    const memory = await this.getMemory(key);
-    return memory !== null;
+  // Save conversation summary
+  static async saveConversationSummary(
+    userId: string,
+    summary: string,
+    messageCount: number
+  ): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('conversation_summaries')
+        .insert({
+          user_id: userId,
+          summary,
+          message_count: messageCount
+        });
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error saving conversation summary:', error);
+      return false;
+    }
+  }
+
+  // Get latest conversation summaries
+  static async getRecentSummaries(userId: string, limit: number = 5): Promise<ConversationSummary[]> {
+    try {
+      const { data, error } = await supabase
+        .from('conversation_summaries')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error getting conversation summaries:', error);
+      return [];
+    }
+  }
+
+  // Build context string from memories for AI
+  static async buildContextForAI(userId: string): Promise<string> {
+    try {
+      const memories = await this.getAllMemories(userId);
+      const summaries = await this.getRecentSummaries(userId, 3);
+
+      let context = '';
+
+      if (memories.length > 0) {
+        context += 'User Details:\n';
+        memories.forEach(mem => {
+          context += `- ${mem.memory_key}: ${mem.memory_value}\n`;
+        });
+      }
+
+      if (summaries.length > 0) {
+        context += '\nRecent Conversations:\n';
+        summaries.forEach((sum, idx) => {
+          context += `${idx + 1}. ${sum.summary}\n`;
+        });
+      }
+
+      return context;
+    } catch (error) {
+      console.error('Error building context:', error);
+      return '';
+    }
   }
 }

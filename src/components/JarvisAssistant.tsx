@@ -19,6 +19,7 @@ import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import { useToast } from '@/hooks/use-toast';
 import { useMobileDetection } from '@/hooks/useMobileDetection';
+import { useAuth } from '@/hooks/useAuth';
 import { MemoryService } from '@/services/MemoryService';
 import { SearchService } from '@/services/SearchService';
 import { AdvancedSystemService } from '@/services/AdvancedSystemService';
@@ -45,6 +46,7 @@ interface JarvisAssistantProps {
 const WAKE_PHRASES = ['hey bro', 'hai bro', 'हे ब्रो', 'हाय ब्रो'];
 
 export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
+  const { user } = useAuth();
   const [isActive, setIsActive] = useState(false);
   const [hasGreeted, setHasGreeted] = useState(false);
   const [detectedLanguage, setDetectedLanguage] = useState<'english' | 'hindi' | 'hinglish'>('english');
@@ -134,6 +136,10 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
 
   const processCommand = async (command: string) => {
     console.log('Processing command:', command);
+    
+    // Build memory context if user is logged in
+    const memoryContext = user?.id ? await MemoryService.buildContextForAI(user.id) : '';
+    
     let response = '';
     const lowerCommand = command.toLowerCase();
 
@@ -210,17 +216,21 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     // Memory commands
     else if (lowerCommand.includes('my name is') || lowerCommand.includes('naam')) {
       const nameMatch = command.match(/my\s+name\s+is\s+(.+)|naam\s+(.+)/i);
-      if (nameMatch) {
+      if (nameMatch && user?.id) {
         const name = (nameMatch[1] || nameMatch[2]).trim();
-        await MemoryService.saveMemory('user_name', name);
+        await MemoryService.saveMemory(user.id, 'user_name', name);
         response = `I'll remember your name is ${name}`;
       }
     }
     else if (lowerCommand.includes('what is my name') || lowerCommand.includes('mera naam')) {
-      const name = await MemoryService.getMemory('user_name');
-      response = name 
-        ? `Your name is ${name}`
-        : 'I don\'t have your name saved yet';
+      if (user?.id) {
+        const name = await MemoryService.getMemory(user.id, 'user_name');
+        response = name 
+          ? `Your name is ${name}`
+          : 'I don\'t have your name saved yet';
+      } else {
+        response = 'Please sign in to use memory features';
+      }
     }
     // Web search - support Hindi/English - trigger on ANY question
     else if (lowerCommand.includes('search') || lowerCommand.includes('google') || 
@@ -254,7 +264,7 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
         try {
           const { data, error: aiError } = await supabase.functions.invoke('openrouter-chat', {
             body: { 
-              messages: [{ role: 'user', content: command }]
+              messages: [{ role: 'user', content: memoryContext ? `${memoryContext}\n\nUser: ${command}` : command }]
             }
           });
           if (!aiError && data.message) {
@@ -357,7 +367,7 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
           // Use AI for conversational responses
           const { data, error } = await supabase.functions.invoke('openrouter-chat', {
             body: { 
-              messages: [{ role: 'user', content: command }]
+              messages: [{ role: 'user', content: memoryContext ? `${memoryContext}\n\nUser: ${command}` : command }]
             }
           });
 

@@ -17,6 +17,7 @@ import AppController from "./components/AppController";
 import ScreenAutomation from "./components/ScreenAutomation";
 import { FaceRecognition } from "./components/FaceRecognition";
 import LanguageSelector from "./components/LanguageSelector";
+import JarvisSettingsPage from "./pages/JarvisSettingsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -82,6 +83,11 @@ const AppContent = () => {
       <Route path="/settings" element={
         <ProtectedRoute>
           <Settings />
+        </ProtectedRoute>
+      } />
+      <Route path="/jarvis-settings" element={
+        <ProtectedRoute>
+          <JarvisSettingsPage />
         </ProtectedRoute>
       } />
       <Route path="/study" element={
