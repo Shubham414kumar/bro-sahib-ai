@@ -18,6 +18,8 @@ import ScreenAutomation from "./components/ScreenAutomation";
 import { FaceRecognition } from "./components/FaceRecognition";
 import LanguageSelector from "./components/LanguageSelector";
 import JarvisSettingsPage from "./pages/JarvisSettingsPage";
+import MemoryDashboard from "./pages/MemoryDashboard";
+import N8nAutomationPage from "./pages/N8nAutomationPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -88,6 +90,16 @@ const AppContent = () => {
       <Route path="/jarvis-settings" element={
         <ProtectedRoute>
           <JarvisSettingsPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/memory" element={
+        <ProtectedRoute>
+          <MemoryDashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/n8n" element={
+        <ProtectedRoute>
+          <N8nAutomationPage />
         </ProtectedRoute>
       } />
       <Route path="/study" element={

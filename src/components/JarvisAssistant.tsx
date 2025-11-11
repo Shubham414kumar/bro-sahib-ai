@@ -82,14 +82,115 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
   const { toast } = useToast();
   const { isMobile, isIOS, isAndroid } = useMobileDetection();
 
-  const { speak, isSpeaking, stop: stopSpeaking } = useTextToSpeech();
+  // Load voice settings and apply them
+  const [voiceSettings, setVoiceSettings] = useState({ pitch: 1, rate: 1, volume: 1 });
+  const { speak: baseSpeakFunction, isSpeaking, stop: stopSpeaking } = useTextToSpeech();
+  
+  const speak = (text: string, options?: any) => {
+    baseSpeakFunction(text, {
+      ...options,
+      pitch: voiceSettings.pitch,
+      rate: voiceSettings.rate,
+      volume: voiceSettings.volume
+    });
+  };
 
-  // Save messages to localStorage whenever they change
+  // Load voice settings
+  useEffect(() => {
+    const loadVoiceSettings = async () => {
+      if (!user?.id) return;
+      const [pitch, rate, volume] = await Promise.all([
+        MemoryService.getMemory(user.id, 'jarvis_voice_pitch'),
+        MemoryService.getMemory(user.id, 'jarvis_voice_rate'),
+        MemoryService.getMemory(user.id, 'jarvis_voice_volume')
+      ]);
+      setVoiceSettings({
+        pitch: pitch ? parseFloat(pitch) : 1,
+        rate: rate ? parseFloat(rate) : 1,
+        volume: volume ? parseFloat(volume) : 1
+      });
+    };
+    loadVoiceSettings();
+  }, [user]);
+
+  // Save messages to localStorage and auto-summarize every 10 messages
   useEffect(() => {
     if (messages.length > 0) {
       localStorage.setItem('jarvis-messages', JSON.stringify(messages));
+      
+      // Auto-summarize every 10 messages
+      if (user?.id && messages.length % 10 === 0) {
+        autoSummarizeConversation();
+      }
     }
   }, [messages]);
+
+  // Auto-summarize conversation
+  const autoSummarizeConversation = async () => {
+    if (!user?.id) return;
+    
+    // Get last 10 messages
+    const recent = messages.slice(-10);
+    const conversationText = recent
+      .map(m => `${m.isUser ? 'User' : 'JARVIS'}: ${m.text}`)
+      .join('\n');
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('openrouter-chat', {
+        body: { 
+          messages: [{
+            role: 'user',
+            content: `Summarize this conversation in 2-3 sentences:\n${conversationText}`
+          }]
+        }
+      });
+      
+      if (!error && data.message) {
+        await MemoryService.saveConversationSummary(user.id, data.message, 10);
+      }
+    } catch (error) {
+      console.error('Auto-summarization error:', error);
+    }
+  };
+
+  // Smart memory extraction
+  const extractAndSaveMemories = async (userMessage: string, aiResponse: string) => {
+    if (!user?.id) return;
+    
+    const lowerMessage = userMessage.toLowerCase();
+    
+    // Extract name
+    if (lowerMessage.includes('my name is') || lowerMessage.includes('naam')) {
+      const nameMatch = userMessage.match(/my\s+name\s+is\s+(.+)|naam\s+(.+)/i);
+      if (nameMatch) {
+        const name = (nameMatch[1] || nameMatch[2]).trim();
+        await MemoryService.saveMemory(user.id, 'user_name', name, 'preferences');
+      }
+    }
+    
+    // Extract favorite topics
+    if (lowerMessage.includes('i love') || lowerMessage.includes('i like') || 
+        lowerMessage.includes('favorite') || lowerMessage.includes('prefer')) {
+      await MemoryService.saveMemory(user.id, 'favorite_topic', userMessage, 'preferences');
+    }
+    
+    // Extract work/profession
+    if (lowerMessage.includes('i work as') || lowerMessage.includes('i am a') ||
+        lowerMessage.includes('my job') || lowerMessage.includes('profession')) {
+      await MemoryService.saveMemory(user.id, 'work_role', userMessage, 'preferences');
+    }
+    
+    // Track common commands
+    const commands = ['weather', 'news', 'youtube', 'calculator', 'time', 'date'];
+    for (const cmd of commands) {
+      if (lowerMessage.includes(cmd)) {
+        const key = `command_${cmd}_count`;
+        const currentCount = await MemoryService.getMemory(user.id, key);
+        const newCount = (parseInt(currentCount || '0') + 1).toString();
+        await MemoryService.saveMemory(user.id, key, newCount, 'usage');
+      }
+    }
+  };
 
   // Initialize services on mount
   useEffect(() => {
@@ -404,6 +505,9 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
       timestamp: new Date()
     };
     setMessages(prev => [...prev, aiMessage]);
+
+    // Extract and save memories intelligently
+    await extractAndSaveMemories(command, response);
 
     // Speak response if not muted and voice enabled
     const voiceEnabled = localStorage.getItem('jarvis-voice-enabled') !== 'false';

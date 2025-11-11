@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Moon, Sun, Volume2, VolumeX, ScrollText, Bot } from 'lucide-react';
+import { ArrowLeft, Moon, Sun, Volume2, VolumeX, ScrollText, Bot, Brain, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -72,6 +72,52 @@ const Settings = () => {
                 className="border-jarvis-blue/30 hover:bg-jarvis-blue/10"
               >
                 Configure
+              </Button>
+            </div>
+          </Card>
+
+          {/* Memory Dashboard */}
+          <Card className="p-6 bg-card/50 backdrop-blur-sm border-jarvis-blue/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Brain className="h-5 w-5 text-jarvis-blue" />
+                <div>
+                  <Label className="text-base font-semibold">Memory Dashboard</Label>
+                  <p className="text-sm text-muted-foreground">
+                    View and manage stored memories
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/memory')}
+                className="border-jarvis-blue/30 hover:bg-jarvis-blue/10"
+              >
+                Manage
+              </Button>
+            </div>
+          </Card>
+
+          {/* n8n Automation */}
+          <Card className="p-6 bg-card/50 backdrop-blur-sm border-jarvis-blue/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Zap className="h-5 w-5 text-jarvis-blue" />
+                <div>
+                  <Label className="text-base font-semibold">n8n Automation</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Call, message, and schedule via n8n
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/n8n')}
+                className="border-jarvis-blue/30 hover:bg-jarvis-blue/10"
+              >
+                Setup
               </Button>
             </div>
           </Card>
