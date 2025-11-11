@@ -99,16 +99,22 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
   useEffect(() => {
     const loadVoiceSettings = async () => {
       if (!user?.id) return;
-      const [pitch, rate, volume] = await Promise.all([
-        MemoryService.getMemory(user.id, 'jarvis_voice_pitch'),
-        MemoryService.getMemory(user.id, 'jarvis_voice_rate'),
-        MemoryService.getMemory(user.id, 'jarvis_voice_volume')
-      ]);
-      setVoiceSettings({
-        pitch: pitch ? parseFloat(pitch) : 1,
-        rate: rate ? parseFloat(rate) : 1,
-        volume: volume ? parseFloat(volume) : 1
-      });
+      try {
+        const [pitch, rate, volume] = await Promise.all([
+          MemoryService.getMemory(user.id, 'jarvis_voice_pitch'),
+          MemoryService.getMemory(user.id, 'jarvis_voice_rate'),
+          MemoryService.getMemory(user.id, 'jarvis_voice_volume')
+        ]);
+        setVoiceSettings({
+          pitch: pitch ? parseFloat(pitch) : 1,
+          rate: rate ? parseFloat(rate) : 1,
+          volume: volume ? parseFloat(volume) : 1
+        });
+      } catch (error) {
+        console.log('Voice settings not found, using defaults');
+        // Use default settings if memories don't exist yet
+        setVoiceSettings({ pitch: 1, rate: 1, volume: 1 });
+      }
     };
     loadVoiceSettings();
   }, [user]);
@@ -157,38 +163,42 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
   const extractAndSaveMemories = async (userMessage: string, aiResponse: string) => {
     if (!user?.id) return;
     
-    const lowerMessage = userMessage.toLowerCase();
-    
-    // Extract name
-    if (lowerMessage.includes('my name is') || lowerMessage.includes('naam')) {
-      const nameMatch = userMessage.match(/my\s+name\s+is\s+(.+)|naam\s+(.+)/i);
-      if (nameMatch) {
-        const name = (nameMatch[1] || nameMatch[2]).trim();
-        await MemoryService.saveMemory(user.id, 'user_name', name, 'preferences');
+    try {
+      const lowerMessage = userMessage.toLowerCase();
+      
+      // Extract name
+      if (lowerMessage.includes('my name is') || lowerMessage.includes('naam')) {
+        const nameMatch = userMessage.match(/my\s+name\s+is\s+(.+)|naam\s+(.+)/i);
+        if (nameMatch) {
+          const name = (nameMatch[1] || nameMatch[2]).trim();
+          await MemoryService.saveMemory(user.id, 'user_name', name, 'preferences');
+        }
       }
-    }
-    
-    // Extract favorite topics
-    if (lowerMessage.includes('i love') || lowerMessage.includes('i like') || 
-        lowerMessage.includes('favorite') || lowerMessage.includes('prefer')) {
-      await MemoryService.saveMemory(user.id, 'favorite_topic', userMessage, 'preferences');
-    }
-    
-    // Extract work/profession
-    if (lowerMessage.includes('i work as') || lowerMessage.includes('i am a') ||
-        lowerMessage.includes('my job') || lowerMessage.includes('profession')) {
-      await MemoryService.saveMemory(user.id, 'work_role', userMessage, 'preferences');
-    }
-    
-    // Track common commands
-    const commands = ['weather', 'news', 'youtube', 'calculator', 'time', 'date'];
-    for (const cmd of commands) {
-      if (lowerMessage.includes(cmd)) {
-        const key = `command_${cmd}_count`;
-        const currentCount = await MemoryService.getMemory(user.id, key);
-        const newCount = (parseInt(currentCount || '0') + 1).toString();
-        await MemoryService.saveMemory(user.id, key, newCount, 'usage');
+      
+      // Extract favorite topics
+      if (lowerMessage.includes('i love') || lowerMessage.includes('i like') || 
+          lowerMessage.includes('favorite') || lowerMessage.includes('prefer')) {
+        await MemoryService.saveMemory(user.id, 'favorite_topic', userMessage, 'preferences');
       }
+      
+      // Extract work/profession
+      if (lowerMessage.includes('i work as') || lowerMessage.includes('i am a') ||
+          lowerMessage.includes('my job') || lowerMessage.includes('profession')) {
+        await MemoryService.saveMemory(user.id, 'work_role', userMessage, 'preferences');
+      }
+      
+      // Track common commands
+      const commands = ['weather', 'news', 'youtube', 'calculator', 'time', 'date'];
+      for (const cmd of commands) {
+        if (lowerMessage.includes(cmd)) {
+          const key = `command_${cmd}_count`;
+          const currentCount = await MemoryService.getMemory(user.id, key);
+          const newCount = (parseInt(currentCount || '0') + 1).toString();
+          await MemoryService.saveMemory(user.id, key, newCount, 'usage');
+        }
+      }
+    } catch (error) {
+      console.log('Memory extraction error (non-critical):', error);
     }
   };
 
@@ -210,9 +220,8 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     if (result.isFinal) {
       const transcript = result.transcript.toLowerCase().trim();
       console.log('📝 Processing transcript:', transcript);
-      console.log('🤖 Is Active:', isActive);
       
-      // Always process commands when transcript is received and listening
+      // Always process commands when transcript is received (hook only fires when listening)
       if (transcript) {
         console.log('✅ Processing command:', transcript);
         
@@ -224,11 +233,11 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
         };
         setMessages(prev => [...prev, userMessage]);
 
-        // Process the command
+        // Process the command immediately
         processCommand(transcript);
       }
     }
-  }, [isActive, hasGreeted]);
+  }, []);
 
   const { isListening, startListening, stopListening, isSupported: speechSupported } = useSpeechRecognition(
     handleSpeechResult,
@@ -236,10 +245,17 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
   );
 
   const processCommand = async (command: string) => {
-    console.log('Processing command:', command);
+    console.log('🔄 Processing command:', command);
     
     // Build memory context if user is logged in
-    const memoryContext = user?.id ? await MemoryService.buildContextForAI(user.id) : '';
+    let memoryContext = '';
+    try {
+      if (user?.id) {
+        memoryContext = await MemoryService.buildContextForAI(user.id);
+      }
+    } catch (error) {
+      console.log('Failed to load memory context (non-critical):', error);
+    }
     
     let response = '';
     const lowerCommand = command.toLowerCase();
@@ -495,7 +511,7 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
       }
     }
 
-    console.log('Generated response:', response);
+    console.log('✅ Generated response:', response);
 
     // Add AI response to chat
     const aiMessage: ChatMessage = {
@@ -512,10 +528,10 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     // Speak response if not muted and voice enabled
     const voiceEnabled = localStorage.getItem('jarvis-voice-enabled') !== 'false';
     if (!isMuted && response && voiceEnabled) {
-      console.log('Speaking response:', response);
+      console.log('🔊 Speaking response:', response);
       speak(response);
     } else {
-      console.log('Not speaking - muted:', isMuted, 'voiceEnabled:', voiceEnabled, 'response:', !!response);
+      console.log('🔇 Not speaking - muted:', isMuted, 'voiceEnabled:', voiceEnabled, 'response:', !!response);
     }
   };
 
