@@ -9,6 +9,7 @@ import { useAuth } from "./hooks/useAuth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Payment from "./pages/Payment";
+import PaymentVerification from "./pages/PaymentVerification";
 import Settings from "./pages/Settings";
 import SystemStatus from "./pages/SystemStatus";
 import Transcript from "./pages/Transcript";
@@ -80,6 +81,11 @@ const AppContent = () => {
       <Route path="/payment" element={
         <ProtectedRoute>
           <Payment />
+        </ProtectedRoute>
+      } />
+      <Route path="/payment-verification" element={
+        <ProtectedRoute>
+          <PaymentVerification />
         </ProtectedRoute>
       } />
       <Route path="/settings" element={

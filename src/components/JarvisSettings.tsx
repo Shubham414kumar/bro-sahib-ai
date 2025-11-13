@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { MemoryService } from '@/services/MemoryService';
 import { useAuth } from '@/hooks/useAuth';
-import { Volume2 } from 'lucide-react';
+import { Volume2, Bell } from 'lucide-react';
 
 export interface JarvisPersonality {
   tone: 'professional' | 'friendly' | 'humorous' | 'casual';
@@ -41,9 +42,13 @@ export const JarvisSettings = ({ onSettingsChange }: JarvisSettingsProps) => {
     }
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [audioFeedbackEnabled, setAudioFeedbackEnabled] = useState(true);
 
   useEffect(() => {
     loadSettings();
+    // Load audio feedback preference
+    const audioFeedback = localStorage.getItem('jarvis-audio-feedback');
+    setAudioFeedbackEnabled(audioFeedback !== 'false');
   }, [user]);
 
   const loadSettings = async () => {
@@ -102,6 +107,9 @@ export const JarvisSettings = ({ onSettingsChange }: JarvisSettingsProps) => {
         description: "JARVIS will now use your customized personality",
       });
 
+      // Save audio feedback preference
+      localStorage.setItem('jarvis-audio-feedback', audioFeedbackEnabled.toString());
+
       onSettingsChange?.(settings);
     } catch (error) {
       toast({
@@ -112,6 +120,15 @@ export const JarvisSettings = ({ onSettingsChange }: JarvisSettingsProps) => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleAudioFeedbackToggle = (checked: boolean) => {
+    setAudioFeedbackEnabled(checked);
+    localStorage.setItem('jarvis-audio-feedback', checked.toString());
+    toast({
+      title: checked ? "Audio Feedback Enabled" : "Audio Feedback Disabled",
+      description: checked ? "JARVIS will play sounds when listening" : "Audio feedback turned off",
+    });
   };
 
   return (
@@ -260,6 +277,29 @@ export const JarvisSettings = ({ onSettingsChange }: JarvisSettingsProps) => {
               <span className="text-sm text-muted-foreground">Loud</span>
             </div>
             <p className="text-xs text-muted-foreground">Current: {Math.round(settings.voiceSettings.volume * 100)}%</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Audio Feedback Settings */}
+      <Card className="p-6 bg-card/50 backdrop-blur-sm border-jarvis-blue/30">
+        <div className="flex items-center gap-2 mb-6">
+          <Bell className="h-5 w-5 text-jarvis-blue" />
+          <h2 className="text-2xl font-bold text-jarvis-blue">Audio Feedback</h2>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label className="text-foreground">Start/Stop Listening Sounds</Label>
+              <p className="text-xs text-muted-foreground">
+                Play audio cues when JARVIS starts and stops listening
+              </p>
+            </div>
+            <Switch
+              checked={audioFeedbackEnabled}
+              onCheckedChange={handleAudioFeedbackToggle}
+            />
           </div>
         </div>
       </Card>
