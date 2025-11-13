@@ -63,7 +63,7 @@ Remember: You're a helpful friend, not just an assistant. Be warm, natural, and 
         'X-Title': 'JARVIS AI Assistant'
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-exp:free',
+        model: 'meta-llama/llama-3.1-8b-instruct:free',
         messages: [
           { role: 'system', content: systemPrompt },
           ...messages

@@ -488,15 +488,21 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
             }
           });
 
-          if (error) throw error;
-          response = data.message || 'Let me search that for you...';
-          
-          // If AI doesn't have answer, search web
-          if (response.toLowerCase().includes("i don't know") || 
-              response.toLowerCase().includes("i cannot") ||
-              response.toLowerCase().includes("sorry")) {
+          if (error) {
+            console.error('❌ AI API Error:', error);
+            // Try web search as fallback
             const searchResult = await SearchService.searchWeb(command);
             response = searchResult;
+          } else {
+            response = data.message || 'Let me search that for you...';
+            
+            // If AI doesn't have answer, search web
+            if (response.toLowerCase().includes("i don't know") || 
+                response.toLowerCase().includes("i cannot") ||
+                response.toLowerCase().includes("sorry")) {
+              const searchResult = await SearchService.searchWeb(command);
+              response = searchResult;
+            }
           }
         }
       } catch (error) {

@@ -56,7 +56,7 @@ export class MemoryService {
         .select('memory_value')
         .eq('user_id', userId)
         .eq('memory_key', key)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data?.memory_value || null;
