@@ -37,7 +37,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.cybersecurity-ai]
-verify_jwt = false
+verify_jwt = true
 
 [functions.process-automations]
-verify_jwt = false
+verify_jwt = true
