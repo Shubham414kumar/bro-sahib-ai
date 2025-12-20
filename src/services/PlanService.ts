@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 export type UserTier = 'free' | 'basic' | 'standard' | 'premium';
 
@@ -83,11 +83,12 @@ class PlanService {
       }
 
       // The function returns a JSON object with success and message
-      if (data.success) {
+      const result = data as { success: boolean; message: string };
+      if (result.success) {
         this.userTier = 'premium';
       }
       
-      return data as { success: boolean; message: string };
+      return result;
     } catch (error) {
       console.error('Error redeeming pass:', error);
       return { success: false, message: 'An error occurred while redeeming the pass' };
