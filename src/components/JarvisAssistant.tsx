@@ -217,24 +217,23 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
 
   const handleSpeechResult = useCallback((result: any) => {
     console.log('🎤 Speech result received:', result);
-    if (result.isFinal) {
+    if (result.isFinal && result.transcript) {
       const transcript = result.transcript.toLowerCase().trim();
       console.log('📝 Processing transcript:', transcript);
       
-      // Always process commands when transcript is received (hook only fires when listening)
       if (transcript) {
         console.log('✅ Processing command:', transcript);
         
         const userMessage: ChatMessage = {
           id: Date.now().toString(),
-          text: transcript,
+          text: result.transcript.trim(), // Keep original case for display
           isUser: true,
           timestamp: new Date()
         };
         setMessages(prev => [...prev, userMessage]);
 
         // Process the command immediately
-        processCommand(transcript);
+        processCommand(result.transcript.trim());
       }
     }
   }, []);
@@ -260,9 +259,12 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     let response = '';
     const lowerCommand = command.toLowerCase();
 
-    // Check for contextual responses first
+    // Check for contextual responses first (greetings, time-based responses)
     const contextualResponse = AutomationService.getContextualResponse(command);
-    if (contextualResponse) {
+    if (contextualResponse && 
+        (lowerCommand.includes('hello') || lowerCommand.includes('hi') || 
+         lowerCommand.includes('good morning') || lowerCommand.includes('good night') ||
+         lowerCommand.includes('namaste') || lowerCommand.includes('नमस्ते'))) {
       response = contextualResponse;
       
       const aiMessage: ChatMessage = {
