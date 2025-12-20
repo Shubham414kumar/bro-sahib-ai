@@ -6,6 +6,65 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Private IP ranges and localhost patterns to block for SSRF protection
+const BLOCKED_IP_PATTERNS = [
+  /^127\./,                    // Localhost
+  /^10\./,                     // Private Class A
+  /^172\.(1[6-9]|2[0-9]|3[0-1])\./, // Private Class B
+  /^192\.168\./,               // Private Class C
+  /^169\.254\./,               // Link-local
+  /^0\./,                      // Reserved
+  /^::1$/,                     // IPv6 localhost
+  /^fc00:/i,                   // IPv6 private
+  /^fe80:/i,                   // IPv6 link-local
+];
+
+const BLOCKED_HOSTNAMES = [
+  'localhost',
+  'internal',
+  'metadata',
+  'metadata.google.internal',
+  '169.254.169.254',           // AWS/GCP metadata
+];
+
+/**
+ * Validates a webhook URL to prevent SSRF attacks
+ * Only allows HTTPS URLs to public, non-internal hosts
+ */
+function isValidWebhookUrl(url: string): { valid: boolean; reason?: string } {
+  try {
+    const parsed = new URL(url);
+    
+    // Only allow HTTPS
+    if (parsed.protocol !== 'https:') {
+      return { valid: false, reason: 'Only HTTPS URLs are allowed' };
+    }
+    
+    const hostname = parsed.hostname.toLowerCase();
+    
+    // Block known internal hostnames
+    if (BLOCKED_HOSTNAMES.some(blocked => hostname === blocked || hostname.endsWith('.' + blocked))) {
+      return { valid: false, reason: 'Internal hostnames are not allowed' };
+    }
+    
+    // Block private IP ranges
+    for (const pattern of BLOCKED_IP_PATTERNS) {
+      if (pattern.test(hostname)) {
+        return { valid: false, reason: 'Private IP addresses are not allowed' };
+      }
+    }
+    
+    // Block URLs with credentials
+    if (parsed.username || parsed.password) {
+      return { valid: false, reason: 'URLs with credentials are not allowed' };
+    }
+    
+    return { valid: true };
+  } catch {
+    return { valid: false, reason: 'Invalid URL format' };
+  }
+}
+
 interface Automation {
   id: string;
   user_id: string;
@@ -97,20 +156,46 @@ serve(async (req) => {
 
           case 'webhook':
             if (automation.action_data.url) {
-              const webhookResponse = await fetch(automation.action_data.url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  automation_id: automation.id,
-                  automation_name: automation.name,
-                  triggered_at: now.toISOString()
-                })
-              });
-              resultData = {
-                url: automation.action_data.url,
-                status: webhookResponse.status,
-                success: webhookResponse.ok
-              };
+              // Validate webhook URL to prevent SSRF attacks
+              const urlValidation = isValidWebhookUrl(automation.action_data.url);
+              if (!urlValidation.valid) {
+                console.warn(`Blocked unsafe webhook URL for automation ${automation.id}: ${urlValidation.reason}`);
+                status = 'failed';
+                errorMessage = `Webhook URL rejected: ${urlValidation.reason}`;
+                resultData = {
+                  url: '[REDACTED]',
+                  blocked: true,
+                  reason: urlValidation.reason
+                };
+                break;
+              }
+              
+              // Use AbortController for timeout protection
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+              
+              try {
+                const webhookResponse = await fetch(automation.action_data.url, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    automation_id: automation.id,
+                    automation_name: automation.name,
+                    triggered_at: now.toISOString()
+                  }),
+                  signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                
+                resultData = {
+                  url: new URL(automation.action_data.url).hostname, // Only log hostname, not full URL
+                  status: webhookResponse.status,
+                  success: webhookResponse.ok
+                };
+              } catch (fetchError) {
+                clearTimeout(timeoutId);
+                throw fetchError;
+              }
             }
             break;
 
