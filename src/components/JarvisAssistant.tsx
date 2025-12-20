@@ -137,13 +137,30 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
         return false;
       }
 
+      // Convert blob to base64 data URI to avoid CSP blob: restrictions
       const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
+      const reader = new FileReader();
       
-      audio.onended = () => URL.revokeObjectURL(audioUrl);
-      await audio.play();
-      return true;
+      return new Promise((resolve) => {
+        reader.onloadend = () => {
+          const base64data = reader.result as string;
+          const audio = new Audio(base64data);
+          
+          audio.onended = () => resolve(true);
+          audio.onerror = () => {
+            console.warn('Audio playback error, falling back to browser TTS');
+            resolve(false);
+          };
+          
+          audio.play().catch(() => {
+            console.warn('Audio play failed, falling back to browser TTS');
+            resolve(false);
+          });
+        };
+        
+        reader.onerror = () => resolve(false);
+        reader.readAsDataURL(audioBlob);
+      });
     } catch (error) {
       console.warn('ElevenLabs TTS error, falling back to browser TTS:', error);
       return false;
