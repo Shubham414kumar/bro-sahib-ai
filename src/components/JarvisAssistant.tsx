@@ -116,7 +116,41 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     return 'en-US';
   };
   
-  const speak = (text: string, options?: any) => {
+  // ElevenLabs TTS with fallback to browser TTS
+  const speakWithElevenLabs = async (text: string, lang: string): Promise<boolean> => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ text, lang }),
+        }
+      );
+
+      if (!response.ok) {
+        console.warn('ElevenLabs TTS failed, falling back to browser TTS');
+        return false;
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      
+      audio.onended = () => URL.revokeObjectURL(audioUrl);
+      await audio.play();
+      return true;
+    } catch (error) {
+      console.warn('ElevenLabs TTS error, falling back to browser TTS:', error);
+      return false;
+    }
+  };
+
+  const speak = async (text: string, options?: any) => {
     // Stop any ongoing speech first
     stopSpeaking();
     
@@ -124,13 +158,18 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     const detectedLang = detectLanguage(text);
     console.log('🗣️ Detected language:', detectedLang, 'for text:', text.substring(0, 50));
     
-    baseSpeakFunction(text, {
-      ...options,
-      lang: detectedLang,
-      pitch: detectedLang === 'hi-IN' ? 1.0 : voiceSettings.pitch, // Natural pitch for Hindi
-      rate: detectedLang === 'hi-IN' ? 0.9 : voiceSettings.rate, // Slightly slower for Hindi clarity
-      volume: voiceSettings.volume
-    });
+    // Try ElevenLabs first, fallback to browser TTS
+    const usedElevenLabs = await speakWithElevenLabs(text, detectedLang);
+    
+    if (!usedElevenLabs) {
+      baseSpeakFunction(text, {
+        ...options,
+        lang: detectedLang,
+        pitch: detectedLang === 'hi-IN' ? 1.0 : voiceSettings.pitch,
+        rate: detectedLang === 'hi-IN' ? 0.9 : voiceSettings.rate,
+        volume: voiceSettings.volume
+      });
+    }
   };
 
 
@@ -696,9 +735,9 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
               setDetectedLanguage(storedLang);
               
               const greetings = {
-                english: 'Hey there! I\'m online and ready to help, bro.',
-                hindi: 'नमस्ते! मैं ऑनलाइन हूँ और मदद के लिए तैयार हूँ।',
-                hinglish: 'Hey bro! Main online hun aur ready hun help karne ke liye.'
+                english: 'Good to see you! I\'m JARVIS, your personal AI assistant. How may I help you today?',
+                hindi: 'स्वागत है! मैं जार्विस हूँ, आपका पर्सनल AI असिस्टेंट। आज मैं आपकी कैसे मदद कर सकता हूँ?',
+                hinglish: 'Welcome! Main JARVIS hoon, aapka personal AI assistant. Aaj main aapki kaise help kar sakta hoon?'
               };
               
               const greeting = greetings[storedLang];
