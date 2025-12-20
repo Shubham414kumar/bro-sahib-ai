@@ -175,9 +175,15 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     const detectedLang = detectLanguage(text);
     console.log('🗣️ Detected language:', detectedLang, 'for text:', text.substring(0, 50));
     
-    // Try ElevenLabs first, fallback to browser TTS
-    const usedElevenLabs = await speakWithElevenLabs(text, detectedLang);
+    // Check if premium ElevenLabs is enabled (requires paid plan)
+    const useElevenLabs = localStorage.getItem('jarvis-elevenlabs-enabled') === 'true';
     
+    let usedElevenLabs = false;
+    if (useElevenLabs) {
+      usedElevenLabs = await speakWithElevenLabs(text, detectedLang);
+    }
+    
+    // Use browser TTS (default - works great!)
     if (!usedElevenLabs) {
       baseSpeakFunction(text, {
         ...options,
