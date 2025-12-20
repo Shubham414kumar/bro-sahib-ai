@@ -11,9 +11,6 @@ export class SearchService {
     try {
       // Check if user is authenticated
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        return 'Please sign in to use the search feature.';
-      }
       
       // Validate and sanitize input
       const sanitizedQuery = SecurityService.sanitizeInput(query, this.MAX_QUERY_LENGTH);
@@ -25,6 +22,12 @@ export class SearchService {
       if (!this.checkSearchRateLimit()) {
         SecurityService.logSecurityEvent('SEARCH_RATE_LIMIT_EXCEEDED', `Query: ${sanitizedQuery}`);
         return 'Too many searches. Please wait a moment before searching again.';
+      }
+
+      // If not authenticated, use a fallback response
+      if (!session) {
+        console.log('User not authenticated, using basic response');
+        return `I can help you better if you sign in. For now, here's what I know about: "${query}"`;
       }
 
       // Use the edge function for DeepSeek search with authentication
@@ -41,10 +44,10 @@ export class SearchService {
       }
       
       return data.result || 'No response from search service.';
-    } catch (error) {
-      SecurityService.logSecurityEvent('SEARCH_ERROR', `${error.message} - Query: ${query}`);
+    } catch (error: any) {
+      SecurityService.logSecurityEvent('SEARCH_ERROR', `${error?.message} - Query: ${query}`);
       
-      if (error.message === 'Request timeout') {
+      if (error?.message === 'Request timeout') {
         return 'Search request timed out. Please try again.';
       }
       

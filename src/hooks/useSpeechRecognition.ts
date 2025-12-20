@@ -75,6 +75,11 @@ export const useSpeechRecognition = (
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const isListeningRef = useRef(false); // Track listening state with ref to avoid stale closure
+  const onResultRef = useRef(onResult); // Keep callback fresh
+
+  // Update refs when values change
+  onResultRef.current = onResult;
 
   const isSupported = typeof window !== 'undefined' && 
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
@@ -91,27 +96,31 @@ export const useSpeechRecognition = (
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
-      console.log('Speech recognition started');
+      console.log('🎤 Speech recognition started');
+      isListeningRef.current = true;
       setIsListening(true);
     };
 
     recognition.onend = () => {
-      console.log('Speech recognition ended');
-      setIsListening(false);
-      // Auto-restart if it ended unexpectedly
-      if (isListening) {
+      console.log('🎤 Speech recognition ended, isListeningRef:', isListeningRef.current);
+      // Auto-restart if we should still be listening
+      if (isListeningRef.current) {
+        console.log('🔄 Auto-restarting speech recognition...');
         setTimeout(() => {
           try {
             recognition.start();
           } catch (e) {
             console.log('Auto-restart failed:', e);
+            isListeningRef.current = false;
+            setIsListening(false);
           }
         }, 100);
+      } else {
+        setIsListening(false);
       }
     };
 
     recognition.onresult = (event) => {
-      console.log('Speech recognition result received:', event);
       let finalTranscript = '';
       let interimTranscript = '';
 
@@ -125,51 +134,47 @@ export const useSpeechRecognition = (
       }
 
       const fullTranscript = finalTranscript || interimTranscript;
-      console.log('Full transcript:', fullTranscript);
       setTranscript(fullTranscript);
 
-      if (onResult && fullTranscript.trim()) {
+      if (onResultRef.current && fullTranscript.trim()) {
         const confidence = event.results[event.results.length - 1]?.[0]?.confidence || 0;
         const isFinal = event.results[event.results.length - 1]?.isFinal || false;
         
-        // Only process results with confidence above 0.5 or interim results
-        if (!isFinal || confidence >= 0.5) {
-          console.log('Calling onResult with:', fullTranscript, 'confidence:', confidence);
-          onResult({
+        // Only process final results
+        if (isFinal) {
+          console.log('✅ Final transcript:', fullTranscript, 'confidence:', confidence);
+          onResultRef.current({
             transcript: fullTranscript,
             confidence,
             isFinal
           });
-        } else {
-          console.log('Skipping low confidence result:', confidence);
         }
       }
     };
 
     recognition.onerror = (event) => {
-      console.error('Speech recognition error:', event.error);
+      console.error('❌ Speech recognition error:', event.error);
       
-      // Handle different error types
       switch (event.error) {
         case 'no-speech':
-          console.log('No speech detected, continuing...');
-          // Don't stop listening for no-speech errors
+          // Don't stop for no-speech, just wait for more input
           break;
         case 'network':
           console.error('Network error in speech recognition');
+          isListeningRef.current = false;
           setIsListening(false);
           break;
         case 'not-allowed':
           console.error('Microphone permission denied');
+          isListeningRef.current = false;
           setIsListening(false);
           break;
         case 'aborted':
           console.log('Speech recognition aborted');
           break;
         default:
-          console.error('Unknown speech recognition error:', event.error);
-          // Try to restart for other errors
-          if (isListening) {
+          // Try to restart for other errors if we should be listening
+          if (isListeningRef.current) {
             setTimeout(() => {
               try {
                 recognition.start();
@@ -182,7 +187,7 @@ export const useSpeechRecognition = (
     };
 
     return recognition;
-  }, [isSupported, language, onResult, isListening]);
+  }, [isSupported, language]);
 
   const startListening = useCallback(() => {
     if (!isSupported) {
@@ -191,11 +196,15 @@ export const useSpeechRecognition = (
     }
 
     try {
+      // Create new recognition instance if needed
       if (!recognitionRef.current) {
         recognitionRef.current = initializeRecognition();
       }
       
       if (recognitionRef.current) {
+        isListeningRef.current = true;
+        setIsListening(true);
+        
         // Stop any existing instance first
         try {
           recognitionRef.current.stop();
@@ -207,25 +216,37 @@ export const useSpeechRecognition = (
         setTimeout(() => {
           try {
             recognitionRef.current?.start();
-          } catch (error) {
-            if (error.message && error.message.includes('already started')) {
+            console.log('🎤 Recognition started successfully');
+          } catch (error: any) {
+            if (error.message?.includes('already started')) {
               console.log('Recognition already started');
             } else {
               console.error('Error starting speech recognition:', error);
+              isListeningRef.current = false;
+              setIsListening(false);
             }
           }
         }, 100);
       }
     } catch (error) {
       console.error('Error in startListening:', error);
+      isListeningRef.current = false;
+      setIsListening(false);
     }
   }, [isSupported, initializeRecognition]);
 
   const stopListening = useCallback(() => {
-    if (recognitionRef.current && isListening) {
-      recognitionRef.current.stop();
+    console.log('🛑 Stopping speech recognition');
+    isListeningRef.current = false;
+    setIsListening(false);
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        // Ignore errors when stopping
+      }
     }
-  }, [isListening]);
+  }, []);
 
   const resetTranscript = useCallback(() => {
     setTranscript('');
