@@ -84,16 +84,55 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
 
   // Load voice settings and apply them
   const [voiceSettings, setVoiceSettings] = useState({ pitch: 1, rate: 1, volume: 1 });
-  const { speak: baseSpeakFunction, isSpeaking, stop: stopSpeaking } = useTextToSpeech();
+  const { speak: baseSpeakFunction, isSpeaking, stop: stopSpeaking, voices } = useTextToSpeech();
+  
+  // Detect language from text
+  const detectLanguage = (text: string): 'hi-IN' | 'en-US' => {
+    // Check for Hindi characters (Devanagari script)
+    const hindiRegex = /[\u0900-\u097F]/;
+    // Check for common Hindi words in Roman script
+    const hindiWords = ['hai', 'hain', 'kya', 'kaise', 'kab', 'kahan', 'kyun', 'aur', 'nahi', 'nhi', 
+                        'mera', 'meri', 'tera', 'teri', 'uska', 'uski', 'hum', 'tum', 'aap', 'woh',
+                        'karo', 'karna', 'bolo', 'batao', 'dekho', 'suno', 'jao', 'aao', 'accha',
+                        'theek', 'bahut', 'zyada', 'kam', 'abhi', 'phir', 'lekin', 'isliye', 'kyunki',
+                        'namaste', 'dhanyawad', 'shukriya', 'bhai', 'behen', 'yaar', 'dost'];
+    
+    const lowerText = text.toLowerCase();
+    
+    // If Hindi script detected
+    if (hindiRegex.test(text)) {
+      return 'hi-IN';
+    }
+    
+    // Count Hindi words in the text
+    const words = lowerText.split(/\s+/);
+    const hindiWordCount = words.filter(word => hindiWords.includes(word)).length;
+    
+    // If more than 20% Hindi words, consider it Hindi/Hinglish
+    if (hindiWordCount > 0 && hindiWordCount / words.length > 0.15) {
+      return 'hi-IN';
+    }
+    
+    return 'en-US';
+  };
   
   const speak = (text: string, options?: any) => {
+    // Stop any ongoing speech first
+    stopSpeaking();
+    
+    // Detect language from the response text
+    const detectedLang = detectLanguage(text);
+    console.log('🗣️ Detected language:', detectedLang, 'for text:', text.substring(0, 50));
+    
     baseSpeakFunction(text, {
       ...options,
-      pitch: voiceSettings.pitch,
-      rate: voiceSettings.rate,
+      lang: detectedLang,
+      pitch: detectedLang === 'hi-IN' ? 1.0 : voiceSettings.pitch, // Natural pitch for Hindi
+      rate: detectedLang === 'hi-IN' ? 0.9 : voiceSettings.rate, // Slightly slower for Hindi clarity
       volume: voiceSettings.volume
     });
   };
+
 
   // Load voice settings
   useEffect(() => {
@@ -345,21 +384,23 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
       const cityMatch = command.match(/weather\s+(?:in|for|of)?\s*(.+)|मौसम\s+(.+)/i);
       const city = cityMatch ? (cityMatch[1] || cityMatch[2]).trim() : 'current location';
       
-      response = 'Checking weather...';
+      // Show loading message but don't speak it
       const searchingMsg: ChatMessage = {
-        id: Date.now().toString(),
-        text: response,
+        id: 'loading-' + Date.now().toString(),
+        text: 'Checking weather...',
         isUser: false,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, searchingMsg]);
-      if (!isMuted) speak(response);
       
       try {
         const weatherInfo = await SearchService.searchWeb(`current weather in ${city}`);
         response = weatherInfo;
+        // Remove loading message
+        setMessages(prev => prev.filter(m => !m.id.startsWith('loading-')));
       } catch (error) {
         response = `Unable to fetch weather for ${city}`;
+        setMessages(prev => prev.filter(m => !m.id.startsWith('loading-')));
       }
     }
     // Memory commands
@@ -391,24 +432,21 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
              lowerCommand.includes('कब') || lowerCommand.includes('कहाँ') ||
              lowerCommand.includes('कैसे') || lowerCommand.includes('क्यों')) {
       
-      response = 'Searching for information...';
-      
+      // Show loading message but don't speak it
       const searchingMessage: ChatMessage = {
-        id: Date.now().toString(),
-        text: response,
+        id: 'loading-' + Date.now().toString(),
+        text: 'Searching...',
         isUser: false,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, searchingMessage]);
       
-      if (!isMuted) speak(response);
-      
       try {
         const searchResult = await SearchService.searchWeb(command);
         response = searchResult;
+        setMessages(prev => prev.filter(m => !m.id.startsWith('loading-')));
       } catch (error) {
         console.error('Search error:', error);
-        response = `I'll try my best to answer: Let me search for that...`;
         // Fallback to AI if search fails
         try {
           const { data, error: aiError } = await supabase.functions.invoke('openrouter-chat', {
@@ -419,8 +457,13 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
           });
           if (!aiError && data.message) {
             response = data.message;
+          } else {
+            response = 'Sorry, I could not find an answer.';
           }
-        } catch {}
+        } catch {
+          response = 'Sorry, I could not process your request.';
+        }
+        setMessages(prev => prev.filter(m => !m.id.startsWith('loading-')));
       }
     }
     // YouTube - support Hindi/English with search
@@ -461,21 +504,22 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     // News - Hindi/English with real-time search
     else if (lowerCommand.includes('news') || lowerCommand.includes('समाचार') ||
              lowerCommand.includes('ख़बर') || lowerCommand.includes('khabar')) {
-      response = 'Fetching latest news...';
+      // Show loading message but don't speak it
       const newsMsg: ChatMessage = {
-        id: Date.now().toString(),
-        text: response,
+        id: 'loading-' + Date.now().toString(),
+        text: 'Fetching news...',
         isUser: false,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, newsMsg]);
-      if (!isMuted) speak(response);
       
       try {
         const news = await SearchService.searchWeb('latest news today');
         response = news;
+        setMessages(prev => prev.filter(m => !m.id.startsWith('loading-')));
       } catch (error) {
         response = 'Unable to fetch news right now';
+        setMessages(prev => prev.filter(m => !m.id.startsWith('loading-')));
       }
     }
     // Advanced System commands with tier checking
@@ -495,16 +539,14 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     else {
       console.log('Using intelligent AI with search capability');
       
-      // Show searching indicator
-      response = 'Let me find that for you...';
+      // Show loading indicator but don't speak it
       const searchingMsg: ChatMessage = {
-        id: Date.now().toString(),
-        text: response,
+        id: 'loading-' + Date.now().toString(),
+        text: 'Thinking...',
         isUser: false,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, searchingMsg]);
-      if (!isMuted) speak(response);
       
       try {
         // First try web search for factual/current information
@@ -528,7 +570,7 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
             const searchResult = await SearchService.searchWeb(command);
             response = searchResult;
           } else {
-            response = data.message || 'Let me search that for you...';
+            response = data.message || 'I could not generate a response.';
             
             // If AI doesn't have answer, search web
             if (response.toLowerCase().includes("i don't know") || 
@@ -549,6 +591,9 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
           response = 'I\'m having trouble right now. Please try again.';
         }
       }
+      
+      // Remove loading message
+      setMessages(prev => prev.filter(m => !m.id.startsWith('loading-')));
     }
 
     console.log('✅ Generated response:', response);
