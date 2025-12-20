@@ -116,58 +116,7 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     return 'en-US';
   };
   
-  // ElevenLabs TTS with fallback to browser TTS
-  const speakWithElevenLabs = async (text: string, lang: string): Promise<boolean> => {
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({ text, lang }),
-        }
-      );
-
-      if (!response.ok) {
-        console.warn('ElevenLabs TTS failed, falling back to browser TTS');
-        return false;
-      }
-
-      // Convert blob to base64 data URI to avoid CSP blob: restrictions
-      const audioBlob = await response.blob();
-      const reader = new FileReader();
-      
-      return new Promise((resolve) => {
-        reader.onloadend = () => {
-          const base64data = reader.result as string;
-          const audio = new Audio(base64data);
-          
-          audio.onended = () => resolve(true);
-          audio.onerror = () => {
-            console.warn('Audio playback error, falling back to browser TTS');
-            resolve(false);
-          };
-          
-          audio.play().catch(() => {
-            console.warn('Audio play failed, falling back to browser TTS');
-            resolve(false);
-          });
-        };
-        
-        reader.onerror = () => resolve(false);
-        reader.readAsDataURL(audioBlob);
-      });
-    } catch (error) {
-      console.warn('ElevenLabs TTS error, falling back to browser TTS:', error);
-      return false;
-    }
-  };
-
-  const speak = async (text: string, options?: any) => {
+  const speak = (text: string, options?: any) => {
     // Stop any ongoing speech first
     stopSpeaking();
     
@@ -175,24 +124,14 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     const detectedLang = detectLanguage(text);
     console.log('🗣️ Detected language:', detectedLang, 'for text:', text.substring(0, 50));
     
-    // Check if premium ElevenLabs is enabled (requires paid plan)
-    const useElevenLabs = localStorage.getItem('jarvis-elevenlabs-enabled') === 'true';
-    
-    let usedElevenLabs = false;
-    if (useElevenLabs) {
-      usedElevenLabs = await speakWithElevenLabs(text, detectedLang);
-    }
-    
-    // Use browser TTS (default - works great!)
-    if (!usedElevenLabs) {
-      baseSpeakFunction(text, {
-        ...options,
-        lang: detectedLang,
-        pitch: detectedLang === 'hi-IN' ? 1.0 : voiceSettings.pitch,
-        rate: detectedLang === 'hi-IN' ? 0.9 : voiceSettings.rate,
-        volume: voiceSettings.volume
-      });
-    }
+    // Use browser TTS with language detection
+    baseSpeakFunction(text, {
+      ...options,
+      lang: detectedLang,
+      pitch: detectedLang === 'hi-IN' ? 1.0 : voiceSettings.pitch,
+      rate: detectedLang === 'hi-IN' ? 0.9 : voiceSettings.rate,
+      volume: voiceSettings.volume
+    });
   };
 
 
