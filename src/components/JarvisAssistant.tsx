@@ -215,6 +215,31 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
     };
   }, []);
 
+  // Load chat history from database when user logs in
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const dbMessages = await MemoryService.getRecentChatMessages(user.id, 50);
+        if (dbMessages.length > 0) {
+          const formattedMessages: ChatMessage[] = dbMessages.map((msg, idx) => ({
+            id: msg.id?.toString() || `db-${idx}`,
+            text: msg.message_text,
+            isUser: msg.sender === 'user',
+            timestamp: new Date(msg.created_at || Date.now())
+          }));
+          setMessages(formattedMessages);
+          console.log('📚 Loaded', formattedMessages.length, 'messages from database');
+        }
+      } catch (error) {
+        console.error('Failed to load chat history:', error);
+      }
+    };
+    
+    loadChatHistory();
+  }, [user?.id]);
+
   const handleSpeechResult = useCallback((result: any) => {
     console.log('🎤 Speech result received:', result);
     if (result.isFinal && result.transcript) {
@@ -231,6 +256,11 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
           timestamp: new Date()
         };
         setMessages(prev => [...prev, userMessage]);
+
+        // Save to database for context memory
+        if (user?.id) {
+          MemoryService.saveChatMessage(user.id, result.transcript.trim(), 'user');
+        }
 
         // Process the command immediately
         processCommand(result.transcript.trim());
@@ -383,7 +413,8 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
         try {
           const { data, error: aiError } = await supabase.functions.invoke('openrouter-chat', {
             body: { 
-              messages: [{ role: 'user', content: memoryContext ? `${memoryContext}\n\nUser: ${command}` : command }]
+              messages: [{ role: 'user', content: command }],
+              context: memoryContext
             }
           });
           if (!aiError && data.message) {
@@ -486,7 +517,8 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
           // Use AI for conversational responses
           const { data, error } = await supabase.functions.invoke('openrouter-chat', {
             body: { 
-              messages: [{ role: 'user', content: memoryContext ? `${memoryContext}\n\nUser: ${command}` : command }]
+              messages: [{ role: 'user', content: command }],
+              context: memoryContext
             }
           });
 
@@ -529,6 +561,11 @@ export const JarvisAssistant = ({ onActiveChange }: JarvisAssistantProps) => {
       timestamp: new Date()
     };
     setMessages(prev => [...prev, aiMessage]);
+
+    // Save AI response to database for context memory
+    if (user?.id) {
+      MemoryService.saveChatMessage(user.id, response, 'assistant');
+    }
 
     // Extract and save memories intelligently
     await extractAndSaveMemories(command, response);

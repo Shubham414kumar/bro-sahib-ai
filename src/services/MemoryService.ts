@@ -19,6 +19,14 @@ export interface ConversationSummary {
   updated_at?: string;
 }
 
+export interface ChatMessage {
+  id?: number;
+  user_id: string;
+  message_text: string;
+  sender: 'user' | 'assistant';
+  created_at?: string;
+}
+
 export class MemoryService {
   // Store a memory for the user
   static async saveMemory(
@@ -105,6 +113,64 @@ export class MemoryService {
     }
   }
 
+  // Save a chat message to database
+  static async saveChatMessage(
+    userId: string,
+    messageText: string,
+    sender: 'user' | 'assistant'
+  ): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('chat_history')
+        .insert({
+          user_id: userId,
+          message_text: messageText,
+          sender
+        });
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error saving chat message:', error);
+      return false;
+    }
+  }
+
+  // Get recent chat messages
+  static async getRecentChatMessages(userId: string, limit: number = 20): Promise<ChatMessage[]> {
+    try {
+      const { data, error } = await supabase
+        .from('chat_history')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      // Reverse to get chronological order
+      return (data || []).reverse() as ChatMessage[];
+    } catch (error) {
+      console.error('Error getting chat messages:', error);
+      return [];
+    }
+  }
+
+  // Clear chat history
+  static async clearChatHistory(userId: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('chat_history')
+        .delete()
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error clearing chat history:', error);
+      return false;
+    }
+  }
+
   // Save conversation summary
   static async saveConversationSummary(
     userId: string,
@@ -146,11 +212,14 @@ export class MemoryService {
     }
   }
 
-  // Build context string from memories for AI
+  // Build context string from memories and chat history for AI
   static async buildContextForAI(userId: string): Promise<string> {
     try {
-      const memories = await this.getAllMemories(userId);
-      const summaries = await this.getRecentSummaries(userId, 3);
+      const [memories, summaries, recentChats] = await Promise.all([
+        this.getAllMemories(userId),
+        this.getRecentSummaries(userId, 3),
+        this.getRecentChatMessages(userId, 10)
+      ]);
 
       let context = '';
 
@@ -162,9 +231,17 @@ export class MemoryService {
       }
 
       if (summaries.length > 0) {
-        context += '\nRecent Conversations:\n';
+        context += '\nPrevious Conversation Summaries:\n';
         summaries.forEach((sum, idx) => {
           context += `${idx + 1}. ${sum.summary}\n`;
+        });
+      }
+
+      if (recentChats.length > 0) {
+        context += '\nRecent Chat History:\n';
+        recentChats.forEach(chat => {
+          const role = chat.sender === 'user' ? 'User' : 'JARVIS';
+          context += `${role}: ${chat.message_text}\n`;
         });
       }
 

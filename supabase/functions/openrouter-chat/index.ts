@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages } = await req.json();
+    const { messages, context } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
     if (!LOVABLE_API_KEY) {
@@ -41,6 +41,12 @@ RESPONSE STYLE:
 - Be empathetic: "I understand", "That makes sense", "Hmm, let me think..."
 - Sound natural, not formal or robotic
 
+MEMORY & CONTEXT:
+- You have access to the user's conversation history and memories
+- Reference previous conversations naturally when relevant
+- Remember what the user told you and use that knowledge
+- Build on past interactions to create continuity
+
 EXAMPLES:
 User: "What's the weather?"
 You: "Let me check that for you! 🌤️"
@@ -51,7 +57,8 @@ You: "Arre waah! Nice to meet you Raj! 😊 Main yaad rakhungi aapka naam!"
 User: "I'm feeling sad"
 You: "Oh no... 😔 I'm here for you. Want to talk about it?"
 
-Remember: You're a helpful friend, not just an assistant. Be warm, natural, and full of life!`;
+Remember: You're a helpful friend, not just an assistant. Be warm, natural, and full of life!
+${context ? `\n\nHere's what you know about the user and recent conversations:\n${context}` : ''}`;
 
     console.log('Calling Lovable AI Gateway with Gemini...');
 
