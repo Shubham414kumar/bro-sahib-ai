@@ -158,21 +158,55 @@ export const useSpeechRecognition = (
       switch (event.error) {
         case 'no-speech':
           // Don't stop for no-speech, just wait for more input
+          console.log('🔇 No speech detected, waiting...');
+          break;
+        case 'audio-capture':
+          // Microphone not available or in use
+          console.error('🎤 Audio capture failed - microphone may be in use or unavailable');
+          // Try to restart after a delay
+          if (isListeningRef.current) {
+            setTimeout(() => {
+              try {
+                recognition.start();
+                console.log('🔄 Restarted after audio-capture error');
+              } catch (e) {
+                console.log('Restart after audio-capture failed:', e);
+                isListeningRef.current = false;
+                setIsListening(false);
+              }
+            }, 1000);
+          }
           break;
         case 'network':
-          console.error('Network error in speech recognition');
-          isListeningRef.current = false;
-          setIsListening(false);
+          console.error('🌐 Network error in speech recognition');
+          // Try restart for network errors
+          if (isListeningRef.current) {
+            setTimeout(() => {
+              try {
+                recognition.start();
+              } catch (e) {
+                console.log('Restart after network error failed:', e);
+                isListeningRef.current = false;
+                setIsListening(false);
+              }
+            }, 1000);
+          }
           break;
         case 'not-allowed':
-          console.error('Microphone permission denied');
+          console.error('🚫 Microphone permission denied');
           isListeningRef.current = false;
           setIsListening(false);
           break;
         case 'aborted':
-          console.log('Speech recognition aborted');
+          console.log('⏹️ Speech recognition aborted');
+          break;
+        case 'service-not-allowed':
+          console.error('🚫 Speech service not allowed');
+          isListeningRef.current = false;
+          setIsListening(false);
           break;
         default:
+          console.log('⚠️ Unknown error:', event.error);
           // Try to restart for other errors if we should be listening
           if (isListeningRef.current) {
             setTimeout(() => {
