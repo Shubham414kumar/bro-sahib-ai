@@ -71,30 +71,62 @@ export const useTextToSpeech = (): UseTextToSpeechReturn => {
         let selectedVoice: SpeechSynthesisVoice | undefined;
         
         if (isHindi) {
-          // For Hindi: Prefer high-quality Hindi voices
+          // Log all available Hindi voices for debugging
+          const hindiVoices = voices.filter(v => 
+            v.lang === 'hi-IN' || v.lang === 'hi' || v.lang.startsWith('hi-')
+          );
+          console.log('🎤 Available Hindi voices:', hindiVoices.map(v => `${v.name} (${v.lang})`));
+          
+          // For Hindi: Comprehensive voice priority list
           selectedVoice = 
-            // Priority 1: Google Hindi Female
-            voices.find(voice => 
-              voice.lang === 'hi-IN' && voice.name.includes('Google') && voice.name.toLowerCase().includes('female')
-            ) ||
-            // Priority 2: Any Google Hindi voice
+            // Priority 1: Google Hindi voices (best quality on Chrome/Android)
             voices.find(voice => 
               voice.lang === 'hi-IN' && voice.name.includes('Google')
             ) ||
-            // Priority 3: Microsoft Hindi voices (Swara is good)
+            // Priority 2: Microsoft Hindi voices - Swara (natural female)
             voices.find(voice => 
-              voice.lang === 'hi-IN' && (voice.name.includes('Swara') || voice.name.includes('Microsoft'))
+              voice.lang === 'hi-IN' && voice.name.includes('Swara')
             ) ||
-            // Priority 4: Lekha (Apple Hindi)
+            // Priority 3: Microsoft Hindi voices - Madhur (natural male)
+            voices.find(voice => 
+              voice.lang === 'hi-IN' && voice.name.includes('Madhur')
+            ) ||
+            // Priority 4: Microsoft Hindi voices - Hemant
+            voices.find(voice => 
+              voice.lang === 'hi-IN' && voice.name.includes('Hemant')
+            ) ||
+            // Priority 5: Microsoft Hindi voices - Kalpana
+            voices.find(voice => 
+              voice.lang === 'hi-IN' && voice.name.includes('Kalpana')
+            ) ||
+            // Priority 6: Any Microsoft Hindi voice
+            voices.find(voice => 
+              voice.lang === 'hi-IN' && voice.name.includes('Microsoft')
+            ) ||
+            // Priority 7: Apple Hindi - Lekha
             voices.find(voice => 
               voice.lang === 'hi-IN' && voice.name.includes('Lekha')
             ) ||
-            // Priority 5: Any Hindi voice
+            // Priority 8: Apple Hindi - Neel
+            voices.find(voice => 
+              voice.lang === 'hi-IN' && voice.name.includes('Neel')
+            ) ||
+            // Priority 9: Samsung Hindi voices
+            voices.find(voice => 
+              voice.lang === 'hi-IN' && voice.name.includes('Samsung')
+            ) ||
+            // Priority 10: Any hi-IN voice
             voices.find(voice => voice.lang === 'hi-IN') ||
-            // Fallback: Hindi-like voice
-            voices.find(voice => voice.lang.startsWith('hi'));
+            // Priority 11: Generic hi language
+            voices.find(voice => voice.lang === 'hi') ||
+            // Fallback: Any voice starting with hi-
+            voices.find(voice => voice.lang.startsWith('hi-'));
             
-          console.log('🎤 Hindi voice selection, available:', voices.filter(v => v.lang.includes('hi')).map(v => v.name));
+          if (selectedVoice) {
+            console.log('✅ Selected Hindi voice:', selectedVoice.name);
+          } else {
+            console.log('⚠️ No Hindi voice found, will use default');
+          }
         } else {
           // Enhanced female voice selection for English with priority order
           selectedVoice = 
